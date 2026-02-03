@@ -125,9 +125,14 @@ public class PvmmTest {
     private static final Object[][] expectedChains = {
             {"f-graph-avvis-chains-semav",          FAIL,   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
             {"f-graph-avvis-chains-semvis",         FAIL,   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"f-graph-problem-chains-avvis-a",      PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-chains-avvis-b",      FAIL,   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"f-graph-problem-chains-avvis-c",      PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+
+            {"f-graph-problem-chains-avvis-5-th-a", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-5-th-b", FAIL,   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"f-graph-problem-chains-avvis-5-th-c", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-5-th-d", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+
+            {"f-graph-problem-chains-avvis-3-th-a", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-3-th-b", FAIL,   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
 
             {"scopes-mp-acq-acq-a",                 PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"scopes-mp-acq-acq-b",                 FAIL,   FAIL,   FAIL,   FAIL,       PASS,   PASS,   PASS},
@@ -136,9 +141,14 @@ public class PvmmTest {
     private static final Object[][] expectedNoChains = {
             {"f-graph-avvis-chains-semav",          PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"f-graph-avvis-chains-semvis",         PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-chains-avvis-a",      PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-chains-avvis-b",      PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-chains-avvis-c",      PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+
+            {"f-graph-problem-chains-avvis-5-th-a", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-5-th-b", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-5-th-c", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-5-th-d", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+
+            {"f-graph-problem-chains-avvis-3-th-a", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-3-th-b", FAIL,   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
 
             {"scopes-mp-acq-acq-a",                 PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"scopes-mp-acq-acq-b",                 PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
