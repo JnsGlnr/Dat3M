@@ -129,7 +129,8 @@ public class PvmmTest {
             {"f-graph-problem-chains-avvis-5-th-a", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"f-graph-problem-chains-avvis-5-th-b", FAIL,   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
             {"f-graph-problem-chains-avvis-5-th-c", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-chains-avvis-5-th-d", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-5-th-d", FAIL,   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"f-graph-problem-chains-avvis-5-th-e", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
 
             {"f-graph-problem-chains-avvis-3-th-a", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"f-graph-problem-chains-avvis-3-th-b", FAIL,   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
@@ -146,6 +147,7 @@ public class PvmmTest {
             {"f-graph-problem-chains-avvis-5-th-b", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"f-graph-problem-chains-avvis-5-th-c", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"f-graph-problem-chains-avvis-5-th-d", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-5-th-e", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
 
             {"f-graph-problem-chains-avvis-3-th-a", PASS,   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"f-graph-problem-chains-avvis-3-th-b", FAIL,   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
