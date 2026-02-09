@@ -18,10 +18,10 @@ public interface ExecutionAnalysis {
 
 
 
-    static ExecutionAnalysis fromConfig(Program program, ProgressModel.Hierarchy progressModel, Context context, Configuration config)
+    static ExecutionAnalysis fromConfig(Program program, Context context, Configuration config)
             throws InvalidConfigurationException {
         final BranchEquivalence eq = context.requires(BranchEquivalence.class);
-        return new DefaultExecutionAnalysis(program, eq, progressModel);
+        return new DefaultExecutionAnalysis(program, eq);
     }
 }
 
@@ -35,9 +35,9 @@ class DefaultExecutionAnalysis implements ExecutionAnalysis {
     private final ProgressModel.Hierarchy progressModel;
     private final Thread lowestIdThread; // For HSA
 
-    public DefaultExecutionAnalysis(Program program, BranchEquivalence eq, ProgressModel.Hierarchy progressModel) {
+    public DefaultExecutionAnalysis(Program program, BranchEquivalence eq) {
         this.eq = eq;
-        this.progressModel = progressModel;
+        this.progressModel = program.getProgressModel();
 
         this.lowestIdThread = program.getThreads().stream().min(Comparator.comparingInt(Thread::getId)).get();
     }

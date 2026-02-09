@@ -2,7 +2,6 @@ package com.dat3m.dartagnan.utils.options;
 
 import com.dat3m.dartagnan.GlobalSettings;
 import com.dat3m.dartagnan.configuration.Method;
-import com.dat3m.dartagnan.configuration.ProgressModel;
 import com.dat3m.dartagnan.configuration.Property;
 import com.dat3m.dartagnan.witness.WitnessType;
 import org.sosy_lab.common.configuration.Option;
@@ -23,20 +22,6 @@ public abstract class BaseOptions {
 
     public EnumSet<Property> getProperty() {
         return property;
-    }
-
-    @Option(
-            name = PROGRESSMODEL,
-            description = """
-                        The progress model to assume: fair (default), hsa, obe, unfair.
-                        To specify progress models per scope, use [<scope>=<progressModel>,...].
-                        Defaults to "fair" for unspecified scopes unless "default=<progressModel>" is specified.
-                        """,
-            toUppercase = true)
-    private ProgressModel.Hierarchy progressModel = ProgressModel.defaultHierarchy();
-
-    public ProgressModel.Hierarchy getProgressModel() {
-        return this.progressModel;
     }
 
     @Option(

@@ -6,6 +6,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.reflect.TypeToken;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.sosy_lab.common.configuration.Configuration;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
 import org.sosy_lab.common.configuration.converters.TypeConverter;
 import org.sosy_lab.common.log.LogManager;
@@ -78,10 +79,25 @@ public enum ProgressModel {
 
         @Override
         public String toString() {
-            if (scope2Progress.isEmpty()) {
+            if (isUniform()) {
                 return defaultProgress.toString();
             } else {
                 return scope2Progress + " with default=" + defaultProgress;
+            }
+        }
+
+        public String toOptionString() {
+            if (isUniform()) {
+                return defaultProgress.toString();
+            } else {
+                StringBuilder builder = new StringBuilder();
+                builder.append("[");
+                scope2Progress.entrySet().stream()
+                        .map(e -> e.getKey() + "=" + e.getValue().toString())
+                        .forEach(builder::append);
+                builder.append(", default=").append(defaultProgress.toString());
+                builder.append("]");
+                return builder.toString();
             }
         }
     }
@@ -141,4 +157,9 @@ public enum ProgressModel {
             return value;
         }
     };
+
+    static {
+        // Register type converter globally
+        Configuration.getDefaultConverters().put(ProgressModel.Hierarchy.class, ProgressModel.HIERARCHY_CONVERTER);
+    }
 }

@@ -107,9 +107,9 @@ public class SpirvLivenessTest {
         VerificationTask.VerificationTaskBuilder builder = VerificationTask.builder()
                 .withConfig(TestHelper.getBasicConfig())
                 .withBound(bound)
-                .withProgressModel(progressModel)
                 .withTarget(Arch.VULKAN);
         Program program = new ProgramParser().parse(new File(programPath));
+        program.setProgressModel(progressModel);
         Wmm mcm = new ParserCat().parse(new File(modelPath));
         return builder.build(program, mcm, EnumSet.of(TERMINATION));
     }

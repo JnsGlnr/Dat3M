@@ -22,7 +22,6 @@ import com.dat3m.dartagnan.program.event.core.threading.ThreadStart;
 import com.dat3m.dartagnan.program.memory.Memory;
 import com.dat3m.dartagnan.program.memory.MemoryObject;
 import com.dat3m.dartagnan.program.misc.NonDetValue;
-
 import com.google.common.base.Preconditions;
 import com.google.common.base.Verify;
 import com.google.common.collect.ImmutableList;
@@ -192,9 +191,11 @@ public class ProgramEncoder implements Encoder {
     }
 
     public BooleanFormula encodeControlFlow() {
-        logger.info("Encoding program control flow with progress model {}", context.getTask().getProgressModel());
-
         final Program program = context.getTask().getProgram();
+        final ProgressModel.Hierarchy progressModel = program.getProgressModel();
+
+        logger.info("Encoding program control flow with progress model {}", progressModel);
+
         final BooleanFormulaManager bmgr = context.getBooleanFormulaManager();
         final ForwardProgressEncoder progressEncoder = new ForwardProgressEncoder();
         List<BooleanFormula> enc = new ArrayList<>();
@@ -207,7 +208,7 @@ public class ProgramEncoder implements Encoder {
         }
 
         // Actual forward progress
-        enc.add(progressEncoder.encodeForwardProgress(program, context.getTask().getProgressModel()));
+        enc.add(progressEncoder.encodeForwardProgress(program, progressModel));
 
         return bmgr.and(enc);
     }

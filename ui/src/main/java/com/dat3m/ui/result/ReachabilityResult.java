@@ -29,6 +29,7 @@ public class ReachabilityResult {
         this.program = program;
         this.wmm = wmm;
         this.options = options;
+
         run();
     }
 
@@ -50,6 +51,7 @@ public class ReachabilityResult {
         }
 
         try {
+            program.setProgressModel(ProgressModel.uniform(options.progress()));
             final Arch arch = program.getArch() != null ? program.getArch() : options.target();
             final Configuration config = Configuration.builder().setOptions(options.config()).build();
             final VerificationTask task = VerificationTask.builder()
@@ -58,7 +60,6 @@ public class ReachabilityResult {
                     .withSolverTimeout(options.timeout())
                     .withSolver(options.solver())
                     .withTarget(arch)
-                    .withProgressModel(ProgressModel.uniform(options.progress()))
                     .build(program, wmm, options.properties());
             try (ModelChecker modelChecker = ModelChecker.create(task, options.method())) {
                 long startTime = System.currentTimeMillis();

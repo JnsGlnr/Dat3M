@@ -1,7 +1,6 @@
 package com.dat3m.dartagnan.utils.rules;
 
 import com.dat3m.dartagnan.configuration.Arch;
-import com.dat3m.dartagnan.configuration.ProgressModel;
 import com.dat3m.dartagnan.configuration.Property;
 import com.dat3m.dartagnan.parsers.cat.ParserCat;
 import com.dat3m.dartagnan.parsers.program.ProgramParser;
@@ -47,31 +46,40 @@ public class Providers {
     // =========================== Program providers ==============================
 
     public static Provider<Program> createProgramFromPath(Supplier<String> pathSupplier) {
-        return createProgramFromFile(() -> new File(pathSupplier.get()));
+        return createProgramFromPath(pathSupplier, Configuration::defaultConfiguration);
+    }
+
+    public static Provider<Program> createProgramFromPath(Supplier<String> pathSupplier, Supplier<Configuration> configSupplier) {
+        return createProgramFromFile(() -> new File(pathSupplier.get()), configSupplier);
     }
 
     public static Provider<Program> createProgramFromFile(Supplier<File> fileSupplier) {
-        return Provider.fromSupplier(() -> new ProgramParser().parse(fileSupplier.get()));
+        return createProgramFromFile(fileSupplier, Configuration::defaultConfiguration);
+    }
+
+    public static Provider<Program> createProgramFromFile(Supplier<File> fileSupplier, Supplier<Configuration> configSupplier) {
+        return Provider.fromSupplier(() -> {
+            Program p = new ProgramParser().parse(fileSupplier.get());
+            p.injectConfig(configSupplier.get());
+            return p;
+        });
     }
 
     // =========================== Task related providers ==============================
 
-    public static Provider<VerificationTask> createTask(Supplier<Program> programSupplier, Supplier<Wmm> wmmSupplier, Supplier<EnumSet<Property>> propertySupplier,
-                                                        Supplier<ProgressModel.Hierarchy> progressModelSupplier, Supplier<Configuration> config) {
+    public static Provider<VerificationTask> createTask(Supplier<Program> programSupplier, Supplier<Wmm> wmmSupplier, Supplier<EnumSet<Property>> propertySupplier, Supplier<Configuration> config) {
         return Provider.fromSupplier(() -> VerificationTask.builder().
                 withConfig(config.get()).
-                withProgressModel(progressModelSupplier.get()).
                 build(programSupplier.get(), wmmSupplier.get(), propertySupplier.get())
         );
     }
 
     public static Provider<VerificationTask> createTask(Supplier<Program> programSupplier, Supplier<Wmm> wmmSupplier, Supplier<EnumSet<Property>> propertySupplier,
-                                                        Supplier<Arch> targetSupplier, Supplier<ProgressModel.Hierarchy> progressModelSupplier, Supplier<Integer> boundSupplier, Supplier<Configuration> config) {
+                                                        Supplier<Arch> targetSupplier, Supplier<Integer> boundSupplier, Supplier<Configuration> config) {
         return Provider.fromSupplier(() -> VerificationTask.builder().
                 withConfig(config.get()).
                 withTarget(targetSupplier.get()).
                 withBound(boundSupplier.get()).
-                withProgressModel(progressModelSupplier.get()).
                 build(programSupplier.get(), wmmSupplier.get(), propertySupplier.get()));
     }
 

@@ -45,11 +45,15 @@ public class ExpressionEncoder {
     private final FormulaManagerExt fmgr;
     private final BooleanFormulaManager bmgr;
     private final Visitor visitor = new Visitor();
+    
+    private final FloatingPointRoundingMode roundingMode;
 
     ExpressionEncoder(EncodingContext context) {
         this.context = context;
         this.fmgr = context.getFormulaManager();
         this.bmgr = fmgr.getBooleanFormulaManager();
+        
+        this.roundingMode = context.getTask().getProgram().getFloatRoundingMode();
     }
 
     private IntegerFormulaManager integerFormulaManager() {
@@ -543,7 +547,7 @@ public class ExpressionEncoder {
             final Formula operand = encodeIntegerExpr(expr.getOperand()).formula();
             final FloatType fType = expr.getTargetType();
             final FloatingPointType targetType = getFloatFormulaType(fType);
-            final Formula enc = floatingPointFormulaManager().castFrom(operand, true, targetType, context.roundingModeFloats);
+            final Formula enc = floatingPointFormulaManager().castFrom(operand, true, targetType, roundingMode);
             return new TypedFormula<>(fType, enc);
         }
 
@@ -561,7 +565,7 @@ public class ExpressionEncoder {
             } else if (floatLiteral.isMinusInf()) {
                 result = floatingPointFormulaManager().makeMinusInfinity(fFType);
             } else {
-                result = floatingPointFormulaManager().makeNumber(floatLiteral.getValue(), fFType, context.roundingModeFloats);
+                result = floatingPointFormulaManager().makeNumber(floatLiteral.getValue(), fFType, roundingMode);
             }
             return new TypedFormula<>(floatLiteral.getType(), result);
         }
@@ -575,10 +579,10 @@ public class ExpressionEncoder {
             final FloatingPointFormulaManager fpmgr = floatingPointFormulaManager();
 
             final FloatingPointFormula result = switch (fBin.getKind()) {
-                case FADD -> fpmgr.add(fp1, fp2, context.roundingModeFloats);
-                case FSUB -> fpmgr.subtract(fp1, fp2, context.roundingModeFloats);
-                case FMUL -> fpmgr.multiply(fp1, fp2, context.roundingModeFloats);
-                case FDIV -> fpmgr.divide(fp1, fp2, context.roundingModeFloats);
+                case FADD -> fpmgr.add(fp1, fp2, roundingMode);
+                case FSUB -> fpmgr.subtract(fp1, fp2, roundingMode);
+                case FMUL -> fpmgr.multiply(fp1, fp2, roundingMode);
+                case FDIV -> fpmgr.divide(fp1, fp2, roundingMode);
                 case FREM -> fpmgr.remainder(fp1, fp2);
                 case FMAX -> fpmgr.max(fp1, fp2);
                 case FMIN -> fpmgr.min(fp1, fp2);
@@ -644,7 +648,7 @@ public class ExpressionEncoder {
 
             final FloatingPointFormulaManager fpmgr = floatingPointFormulaManager();
             final FloatingPointType fType = getFloatFormulaType(expr.getTargetType());
-            final Formula enc = fpmgr.castFrom(inner.formula(), true, fType, context.roundingModeFloats);
+            final Formula enc = fpmgr.castFrom(inner.formula(), true, fType, roundingMode);
             return new TypedFormula<>(expr.getType(), enc);
         }
 

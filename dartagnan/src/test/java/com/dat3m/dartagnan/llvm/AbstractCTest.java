@@ -90,7 +90,7 @@ public abstract class AbstractCTest {
     protected final Provider<Solvers> solverProvider = getSolverProvider();
     protected final Provider<EnumSet<Property>> propertyProvider = getPropertyProvider();
     protected final Provider<Configuration> configurationProvider = Provider.fromSupplier(this::getBaseConfiguration);
-    protected final Provider<VerificationTask> taskProvider = Providers.createTask(programProvider, wmmProvider, propertyProvider, progressModelProvider, configurationProvider);
+    protected final Provider<VerificationTask> taskProvider = Providers.createTask(programProvider, wmmProvider, propertyProvider, configurationProvider);
 
     // Special rules
     protected final Timeout timeout = Timeout.millis(getTimeout());

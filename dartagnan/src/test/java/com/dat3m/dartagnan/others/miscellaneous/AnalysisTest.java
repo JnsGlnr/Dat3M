@@ -2,7 +2,6 @@ package com.dat3m.dartagnan.others.miscellaneous;
 
 import com.dat3m.dartagnan.configuration.Alias;
 import com.dat3m.dartagnan.configuration.Arch;
-import com.dat3m.dartagnan.configuration.ProgressModel;
 import com.dat3m.dartagnan.expression.Expression;
 import com.dat3m.dartagnan.expression.ExpressionFactory;
 import com.dat3m.dartagnan.expression.type.IntegerType;
@@ -106,7 +105,7 @@ public class AnalysisTest {
         Configuration config = Configuration.builder().setOption(REACHING_DEFINITIONS_METHOD, method.name()).build();
         Context context = Context.create();
         context.register(BranchEquivalence.class, BranchEquivalence.fromConfig(program, config));
-        context.register(ExecutionAnalysis.class, ExecutionAnalysis.fromConfig(program, ProgressModel.uniform(ProgressModel.FAIR), context, config));
+        context.register(ExecutionAnalysis.class, ExecutionAnalysis.fromConfig(program, context, config));
         final ReachingDefinitionsAnalysis rd = ReachingDefinitionsAnalysis.fromConfig(program, context, config);
         var me0 = (RegReader) findMatchingEventAfterProcessing(program, e0);
         var me1 = (RegReader) findMatchingEventAfterProcessing(program, e1);
@@ -655,7 +654,7 @@ public class AnalysisTest {
         ProcessingManager.fromConfig(configuration).run(program);
         Context analysisContext = Context.create();
         analysisContext.register(BranchEquivalence.class, BranchEquivalence.fromConfig(program, configuration));
-        analysisContext.register(ExecutionAnalysis.class, ExecutionAnalysis.fromConfig(program, ProgressModel.uniform(ProgressModel.FAIR), analysisContext, configuration));
+        analysisContext.register(ExecutionAnalysis.class, ExecutionAnalysis.fromConfig(program, analysisContext, configuration));
         analysisContext.register(ReachingDefinitionsAnalysis.class, ReachingDefinitionsAnalysis.fromConfig(program, analysisContext, configuration));
         return AliasAnalysis.fromConfig(program, analysisContext, configuration, false);
     }
@@ -769,8 +768,7 @@ public class AnalysisTest {
 
         Context analysisContext = Context.create();
         analysisContext.register(BranchEquivalence.class, BranchEquivalence.fromConfig(program, config));
-        analysisContext.register(ExecutionAnalysis.class, ExecutionAnalysis.fromConfig(program,
-                ProgressModel.defaultHierarchy(), analysisContext, config));
+        analysisContext.register(ExecutionAnalysis.class, ExecutionAnalysis.fromConfig(program, analysisContext, config));
         analysisContext.register(ReachingDefinitionsAnalysis.class,
                 ReachingDefinitionsAnalysis.fromConfig(program, analysisContext, config));
         assertTrue(program.getThreadEvents(Init.class).isEmpty());

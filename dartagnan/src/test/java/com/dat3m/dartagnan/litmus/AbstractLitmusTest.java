@@ -79,6 +79,7 @@ public abstract class AbstractLitmusTest {
                 .setOption(BOUND, boundProvider.get().toString())
                 .setOption(TARGET, targetProvider.get().name())
                 .setOption(PHANTOM_REFERENCES, "true")
+                .setOption(PROGRESSMODEL, progressModelProvider.get().toOptionString())
                 .setOption(INITIALIZE_REGISTERS, "true");
 
         return additionalConfig(configBase).build();
@@ -117,13 +118,13 @@ public abstract class AbstractLitmusTest {
     protected final Provider<String> filePathProvider = () -> path;
     protected final Provider<String> nameProvider = Provider.fromSupplier(() -> getNameWithoutExtension(Path.of(path).getFileName().toString()));
     protected final Provider<Integer> boundProvider = getBoundProvider();
-    protected final Provider<Program> programProvider = Providers.createProgramFromPath(filePathProvider);
-    protected final Provider<Wmm> wmmProvider = getWmmProvider();
     protected final Provider<ProgressModel.Hierarchy> progressModelProvider = getProgressModelProvider();
+    protected final Provider<Configuration> configProvider = Provider.fromSupplier(this::getConfiguration);
+    protected final Provider<Program> programProvider = Providers.createProgramFromPath(filePathProvider, configProvider);
+    protected final Provider<Wmm> wmmProvider = getWmmProvider();
     protected final Provider<EnumSet<Property>> propertyProvider = getPropertyProvider();
     protected final Provider<Result> expectedResultProvider = Provider.fromSupplier(() -> expectedResults.get(filePathProvider.get().substring(filePathProvider.get().indexOf("/") + 1)));
-    protected final Provider<Configuration> configProvider = Provider.fromSupplier(this::getConfiguration);
-    protected final Provider<VerificationTask> taskProvider = Providers.createTask(programProvider, wmmProvider, propertyProvider, progressModelProvider, configProvider);
+    protected final Provider<VerificationTask> taskProvider = Providers.createTask(programProvider, wmmProvider, propertyProvider, configProvider);
 
     private final Timeout timeout = Timeout.millis(getTimeout());
     private final RequestShutdownOnError shutdownOnError = RequestShutdownOnError.create(shutdownManagerProvider);
@@ -134,11 +135,11 @@ public abstract class AbstractLitmusTest {
             .around(filePathProvider)
             .around(nameProvider)
             .around(boundProvider)
+            .around(progressModelProvider)
+            .around(configProvider)
             .around(programProvider)
             .around(wmmProvider)
-            .around(progressModelProvider)
             .around(propertyProvider)
-            .around(configProvider)
             .around(taskProvider)
             .around(expectedResultProvider)
             .around(timeout);

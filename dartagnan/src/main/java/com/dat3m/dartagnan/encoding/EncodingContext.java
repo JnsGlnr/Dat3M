@@ -24,7 +24,6 @@ import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import com.google.common.collect.Iterables;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
@@ -32,20 +31,14 @@ import org.sosy_lab.common.configuration.Option;
 import org.sosy_lab.common.configuration.Options;
 import org.sosy_lab.java_smt.api.*;
 import org.sosy_lab.java_smt.api.NumeralFormula.IntegerFormula;
-import org.sosy_lab.java_smt.api.FloatingPointRoundingMode;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.dat3m.dartagnan.configuration.OptionNames.*;
 import static com.dat3m.dartagnan.program.event.Tag.INIT;
 import static com.dat3m.dartagnan.program.event.Tag.WRITE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.sosy_lab.java_smt.api.FloatingPointRoundingMode.*;
 
 @Options
 public final class EncodingContext {
@@ -79,13 +72,6 @@ public final class EncodingContext {
             description = "Data is encoded with mathematical integers instead of bitvectors.  Default: false.",
             secure = true)
     boolean useIntegers = false;
-
-    // TODO: If we ever simplify floats, this option will play a role there besides than the encoding.
-    // If that is the case we need to move this option outside of this encoding class.
-    @Option(name = ROUNDING_MODE_FLOATS,
-            description = "Rounding mode for floating point operations.",
-            secure = true)
-    FloatingPointRoundingMode roundingModeFloats = NEAREST_TIES_TO_EVEN;
 
     private final Map<Event, BooleanFormula> controlFlowVariables = new HashMap<>();
     private final Map<Event, BooleanFormula> executionVariables = new HashMap<>();
@@ -128,7 +114,7 @@ public final class EncodingContext {
         task.getConfig().inject(context);
         logger.info("{}: {}", IDL_TO_SAT, context.useSATEncoding);
         logger.info("{}: {}", MERGE_CF_VARS, context.shouldMergeCFVars);
-        logger.info("{}: {}", ROUNDING_MODE_FLOATS, context.roundingModeFloats);
+        logger.info("{}: {}", ROUNDING_MODE_FLOATS, context.getTask().getProgram().getFloatRoundingMode());
         context.initialize();
         if (logger.isInfoEnabled()) {
             logger.info("Number of encoded edges for acyclicity: {}",
@@ -336,7 +322,7 @@ public final class EncodingContext {
         // Only for the standard fair progress model we can merge CF variables.
         // TODO: It would also be possible for OBE/HSA in some cases if we refine the cf-equivalence classes
         //  to classes per thread.
-        final boolean mergeCFVars = shouldMergeCFVars && verificationTask.getProgressModel().isFair();
+        final boolean mergeCFVars = shouldMergeCFVars && verificationTask.getProgram().getProgressModel().isFair();
         if (mergeCFVars) {
             for (BranchEquivalence.Class cls : analysisContext.get(BranchEquivalence.class).getAllEquivalenceClasses()) {
                 BooleanFormula v = booleanFormulaManager.makeVariable("cf " + cls.getRepresentative().getGlobalId());

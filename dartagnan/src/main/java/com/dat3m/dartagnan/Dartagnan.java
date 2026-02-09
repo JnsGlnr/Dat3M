@@ -35,7 +35,6 @@ import com.dat3m.dartagnan.witness.graphml.WitnessBuilder;
 import com.dat3m.dartagnan.witness.graphml.WitnessGraph;
 import com.dat3m.dartagnan.wmm.Wmm;
 import com.dat3m.dartagnan.wmm.axiom.Axiom;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.CharSource;
@@ -83,6 +82,11 @@ public class Dartagnan extends BaseOptions {
         config.recursiveInject(this);
     }
 
+    static {
+        // Register type converters globally
+        Configuration.getDefaultConverters().put(ProgressModel.Hierarchy.class, ProgressModel.HIERARCHY_CONVERTER);
+    }
+
     private static Configuration loadConfiguration(String[] args) throws InvalidConfigurationException, IOException {
         final var preamble = new StringBuilder();
         final var options = new StringBuilder();
@@ -95,7 +99,6 @@ public class Dartagnan extends BaseOptions {
         }
         final CharSource source = CharSource.concat(CharSource.wrap(preamble), CharSource.wrap(options));
         return Configuration.builder()
-                .addConverter(ProgressModel.Hierarchy.class, ProgressModel.HIERARCHY_CONVERTER)
                 .loadFromSource(source, ".", ".")
                 .build();
     }
@@ -146,10 +149,11 @@ public class Dartagnan extends BaseOptions {
                     p.setEntrypoint(new Entrypoint.Simple(p.getFunctionByName(o.getEntryFunction()).orElseThrow(
                         () -> new MalformedProgramException(String.format("Program has no function named %s. Select a different entry point.", o.getEntryFunction())))));
                 }
+                p.injectConfig(config);
+
                 final Wmm mcm = new ParserCat(Path.of(o.getCatIncludePath())).parse(fileModel);
                 final VerificationTaskBuilder builder = VerificationTask.builder()
                         .withConfig(config)
-                        .withProgressModel(o.getProgressModel())
                         .withWitness(witness);
                 // If the arch has been set during parsing (this only happens for litmus tests)
                 // and the user did not explicitly add the target option, we use the one

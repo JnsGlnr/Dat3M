@@ -1,7 +1,6 @@
 package com.dat3m.dartagnan.verification;
 
 import com.dat3m.dartagnan.configuration.Arch;
-import com.dat3m.dartagnan.configuration.ProgressModel;
 import com.dat3m.dartagnan.configuration.Property;
 import com.dat3m.dartagnan.program.Program;
 import com.dat3m.dartagnan.witness.graphml.WitnessGraph;
@@ -25,17 +24,15 @@ public class VerificationTask {
     // Data objects
     private final Program program;
     private final Wmm memoryModel;
-    private final ProgressModel.Hierarchy progressModel;
     private final EnumSet<Property> property;
     private final WitnessGraph witness;
     private final Configuration config;
 
-    protected VerificationTask(Program program, Wmm memoryModel, ProgressModel.Hierarchy progressModel,
+    protected VerificationTask(Program program, Wmm memoryModel,
                                EnumSet<Property> property, WitnessGraph witness, Configuration config)
     throws InvalidConfigurationException {
         this.program = checkNotNull(program);
         this.memoryModel = checkNotNull(memoryModel);
-        this.progressModel = checkNotNull(progressModel);
         this.property = checkNotNull(property);
         this.witness = checkNotNull(witness);
         this.config = checkNotNull(config);
@@ -47,7 +44,6 @@ public class VerificationTask {
 
     public Program getProgram() { return program; }
     public Wmm getMemoryModel() { return memoryModel; }
-    public ProgressModel.Hierarchy getProgressModel() { return progressModel; }
     public Configuration getConfig() { return this.config; }
     public WitnessGraph getWitness() { return witness; }
     public EnumSet<Property> getProperty() { return property; }
@@ -58,7 +54,6 @@ public class VerificationTask {
     public static class VerificationTaskBuilder {
         protected WitnessGraph witness = new WitnessGraph();
         protected ConfigurationBuilder config = Configuration.builder();
-        protected ProgressModel.Hierarchy progressModel = ProgressModel.defaultHierarchy();
 
         protected VerificationTaskBuilder() { }
 
@@ -79,11 +74,6 @@ public class VerificationTask {
             return this;
         }
 
-        public VerificationTaskBuilder withProgressModel(ProgressModel.Hierarchy progressModel) {
-            this.progressModel = progressModel;
-            return this;
-        }
-
         public VerificationTaskBuilder withSolverTimeout(int t) {
             this.config.setOption(TIMEOUT, Integer.toString(t));
             return this;
@@ -100,7 +90,7 @@ public class VerificationTask {
         }
 
         public VerificationTask build(Program program, Wmm memoryModel, EnumSet<Property> property) throws InvalidConfigurationException {
-            return new VerificationTask(program, memoryModel, progressModel, property, witness, config.build());
+            return new VerificationTask(program, memoryModel, property, witness, config.build());
         }
     }
 }
