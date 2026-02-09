@@ -44,6 +44,7 @@ public abstract class AbstractCTest {
                 .setOption(OptionNames.SOLVER, getSolverProvider().get().name())
                 .setOption(OptionNames.BOUND, getBoundProvider().get().toString())
                 .setOption(OptionNames.TARGET, targetProvider.get().name())
+                .setOption(OptionNames.PROGRESSMODEL, progressModelProvider.get().toOptionString())
                 .setOption(OptionNames.PHANTOM_REFERENCES, "true");
 
         return additionalConfig(configBase).build();
@@ -84,12 +85,12 @@ public abstract class AbstractCTest {
     protected final Provider<Arch> targetProvider = () -> target;
     protected final Provider<String> filePathProvider = getProgramPathProvider();
     protected final Provider<Integer> boundProvider = getBoundProvider();
-    protected final Provider<Program> programProvider = Providers.createProgramFromPath(filePathProvider);
+    protected final Provider<Configuration> configurationProvider = Provider.fromSupplier(this::getBaseConfiguration);
+    protected final Provider<Program> programProvider = Providers.createProgramFromPath(filePathProvider, configurationProvider);
     protected final Provider<Wmm> wmmProvider = getWmmProvider();
     protected final Provider<ProgressModel.Hierarchy> progressModelProvider = getProgressModelProvider();
     protected final Provider<Solvers> solverProvider = getSolverProvider();
     protected final Provider<EnumSet<Property>> propertyProvider = getPropertyProvider();
-    protected final Provider<Configuration> configurationProvider = Provider.fromSupplier(this::getBaseConfiguration);
     protected final Provider<VerificationTask> taskProvider = Providers.createTask(programProvider, wmmProvider, propertyProvider, configurationProvider);
 
     // Special rules
@@ -102,12 +103,12 @@ public abstract class AbstractCTest {
             .around(shutdownOnError)
             .around(filePathProvider)
             .around(boundProvider)
+            .around(configurationProvider)
             .around(programProvider)
             .around(wmmProvider)
             .around(progressModelProvider)
             .around(solverProvider)
             .around(propertyProvider)
-            .around(configurationProvider)
             .around(taskProvider)
             .around(timeout);
 
