@@ -4,7 +4,6 @@ import com.dat3m.dartagnan.configuration.Arch;
 import com.dat3m.dartagnan.expression.Expression;
 import com.dat3m.dartagnan.expression.Type;
 import com.dat3m.dartagnan.expression.type.BooleanType;
-import com.dat3m.dartagnan.expression.type.TypeFactory;
 import com.dat3m.dartagnan.program.Register;
 import com.dat3m.dartagnan.program.event.Event;
 import com.dat3m.dartagnan.program.event.EventFactory;
@@ -97,10 +96,13 @@ public class VisitorC11 extends VisitorBase {
         Expression address = e.getAddress();
         String mo = e.getMo();
 
-        Register dummyReg = e.getFunction().newRegister(TypeFactory.getInstance().getArchType());
+        Register dummyReg = e.getFunction().newRegister(e.getAccessType());
         Load load = newRMWLoad(dummyReg, address);
         Local localOp = newLocal(dummyReg, expressions.makeIntBinary(dummyReg, e.getOperator(), e.getOperand()));
         RMWStore store = newRMWStoreWithMo(load, address, dummyReg, Tag.C11.storeMO(mo));
+
+        load.addTags(Tag.C11.NORETURN);
+        store.addTags(Tag.C11.NORETURN);
 
         return tagList(e, eventSequence(
                 load,

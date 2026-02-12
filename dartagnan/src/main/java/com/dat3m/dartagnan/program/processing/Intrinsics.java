@@ -216,6 +216,8 @@ public class Intrinsics {
         LLVM_MEMCPY("llvm.memcpy", true, true, true, false, Intrinsics::inlineMemCpy),
         LLVM_MEMSET("llvm.memset", true, false, true, false, Intrinsics::inlineMemSet),
         LLVM_THREADLOCAL("llvm.threadlocal.address.p0", false, false, true, true, Intrinsics::inlineLLVMThreadLocal),
+        // --------------------------- C26 ---------------------------
+        C26_ATOMIC_OP("__C26_atomic_op", true, true, true, true, Intrinsics::handleC26AtomicOP),
         // --------------------------- LKMM ---------------------------
         LKMM_LOAD("__LKMM_load", false, true, true, true, Intrinsics::handleLKMMIntrinsic),
         LKMM_STORE("__LKMM_store", true, false, true, true, Intrinsics::handleLKMMIntrinsic),
@@ -297,14 +299,13 @@ public class Intrinsics {
 
         private boolean matches(String funcName) {
             boolean isPrefix = switch(this) {
-                case LLVM, LLVM_ASSUME, LLVM_META, LLVM_MEMCPY, LLVM_MEMSET, LLVM_EXPECT, LLVM_OBJECTSIZE -> true;
+                case LLVM, LLVM_ASSUME, LLVM_META, LLVM_MEMCPY, LLVM_MEMSET, LLVM_EXPECT, LLVM_OBJECTSIZE, C26_ATOMIC_OP -> true;
                 default -> false;
             };
             BiPredicate<String, String> matchingFunction = isPrefix ? String::startsWith : String::equals;
             return variants.stream().anyMatch(v -> matchingFunction.test(funcName, v));
         }
     }
-
 
     @FunctionalInterface
     private interface Replacer {
@@ -1428,6 +1429,41 @@ public class Intrinsics {
         return expressions.makeAnd(
                 expressions.makeLTE(minValue, value, true),
                 expressions.makeLTE(value, maxValue, true)
+        );
+    }
+
+    // --------------------------------------------------------------------------------------------------------
+    // C26 atomics
+
+    private IntBinaryOp toCOp(Expression opCode) {
+        if (!(opCode instanceof IntLiteral literal)) {
+            throw new UnsupportedOperationException("Variable op code \"" + opCode + "\"");
+        }
+        return switch (literal.getValueAsInt()) {
+            case 0 -> IntBinaryOp.ADD;
+            case 1 -> IntBinaryOp.SUB;
+            case 2 -> IntBinaryOp.AND;
+            case 3 -> IntBinaryOp.OR;
+            case 4 -> IntBinaryOp.XOR;
+            default -> throw new UnsupportedOperationException("Operation \"" + literal.getValueAsInt() + "\" not yet supported");
+        };
+    }
+
+    private String toCMemoryOrder(Expression moCode) {
+        if (!(moCode instanceof IntLiteral literal)) {
+            throw new UnsupportedOperationException("Variable memory order \"" + moCode + "\"");
+        }
+        return Tag.C11.intToMo(literal.getValueAsInt());
+    }
+
+    private List<Event> handleC26AtomicOP(FunctionCall call) {
+        final Expression address = call.getArguments().get(0);
+        final Expression value = call.getArguments().get(1);
+        final Expression opCode = call.getArguments().get(2);
+        final Expression moCode = call.getArguments().get(3);
+
+        return List.of(
+                EventFactory.Atomic.newRMWOp(address, value, toCOp(opCode), toCMemoryOrder(moCode))
         );
     }
 
