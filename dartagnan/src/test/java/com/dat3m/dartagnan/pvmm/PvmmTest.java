@@ -79,6 +79,9 @@ public class PvmmTest {
             {"3-f-graph-problem-semsc-lb-d",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"3-f-graph-problem-semsc-lb-d-acqrel",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
 
+            {"x-sb",                                  PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"x-sb-fence",                            PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+
             {"f-graph-problem-avvis-mp-a",            PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"f-graph-problem-avvis-mp-b",            FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL}, // TODO:
             {"f-graph-problem-avvis-mp-c",            FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
@@ -99,8 +102,6 @@ public class PvmmTest {
             {"f-graph-mp3-sc-b",                      FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS}, // TODO:
             {"f-graph-mp3-sc-b",                      FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS}, // TODO:
 
-            {"extra-sb",                              PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"extra-sb-fence",                        PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
             {"extra-lb",                              FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
             {"extra-lb-fence-1",                      FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
             {"extra-lb-fence-2",                      FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
