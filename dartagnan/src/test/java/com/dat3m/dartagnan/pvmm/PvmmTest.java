@@ -22,20 +22,17 @@ import org.junit.Test;
 import org.sosy_lab.common.configuration.Configuration;
 import org.sosy_lab.java_smt.api.Model;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static com.dat3m.dartagnan.configuration.OptionNames.*;
 import static com.dat3m.dartagnan.configuration.Property.CAT_SPEC;
 import static com.dat3m.dartagnan.configuration.Property.PROGRAM_SPEC;
 import static com.dat3m.dartagnan.utils.ResourceHelper.getRootPath;
 import static com.dat3m.dartagnan.utils.Result.FAIL;
-import static com.dat3m.dartagnan.utils.Result.PASS;
 import static java.util.stream.Collectors.toMap;
 import static org.junit.Assert.*;
 
@@ -46,143 +43,65 @@ public class PvmmTest {
             "nochains", Path.of(getRootPath("cat/nochains"))
     );
 
-    private static final String[] models = {
-            "vulkan_pvmm",
-            "vulkan_pvmm_semsc",
-            "vulkan_pvmm_semsc_fence",
-            "vulkan_current_pvmm",
-            "vulkan_current_pvmm_semsc",
-            "vulkan_current_pvmm_semsc_fence",
-    };
-
-    private static final Object[][] expectedAll = {
-                                                      // orig             // current
-            // test                                   base    semsc       base    semsc
-
-            {"2-f-graph-mp-semsc-a",                  FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"2-f-graph-mp-semsc-b",                  PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"2-f-graph-mp-semsc-c",                  FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-
-            {"2-f-graph-mp-avvis-a",                  PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"2-f-graph-mp-avvis-b",                  FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-
-            {"3-f-graph-problem-semsc-mp-a",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-mp-b",          FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-mp-c",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-mp-fences-a",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-mp-fences-b",   FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-mp-fences-c",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-lb-a",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-lb-b",          FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-lb-c",          FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-lb-c-acqrel",   FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-lb-d",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-semsc-lb-d-acqrel",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-
-            {"x-sb",                                  PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"x-sb-fence",                            PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-
-            {"f-graph-problem-avvis-mp-a",            PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-avvis-mp-b",            FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL}, // TODO:
-            {"f-graph-problem-avvis-mp-c",            FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"f-graph-problem-avvis-mp-d",            PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-avvis-mp-e",            FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"f-graph-problem-avvis-mp-f",            PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-avvis-mp-g",            FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"f-graph-problem-avvis-mp-aa",           PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-avvis-mp-bb",           FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL}, // TODO:
-
-            {"f-graph-mp3-a",                         FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
-            {"f-graph-mp3-af",                        FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL},
-            {"f-graph-mp3-b",                         FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS}, // TODO:
-            {"f-graph-mp3-bf",                        FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL}, // TODO:
-
-            {"f-graph-mp3-sc-a",                      FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
-            {"f-graph-mp3-sc-af",                     FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL}, // TODO:
-            {"f-graph-mp3-sc-b",                      FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS}, // TODO:
-            {"f-graph-mp3-sc-b",                      FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS}, // TODO:
-
-            {"extra-lb",                              FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"extra-lb-fence-1",                      FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"extra-lb-fence-2",                      FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"extra-mp3",                             FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"extra-mp3-fence1",                      FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL},
-            {"extra-mp3-fence2",                      PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"extra-mp-plus-fence",                   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"extra-mp-plus",                         PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"extra-lb-plus",                         PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-
-            {"mp3transitive3",                        FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
-            {"mp3transitive3-fence",                  FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL},
-
-            {"old_f-graph-problem3-a",                FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
-            {"old_f-graph-problem3-b",                PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-    };
-
-    private static final Object[][] expectedChains = {
-            {"2-f-graph-avvis-chains-semav",          FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"2-f-graph-avvis-chains-semvis",         FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-
-            {"3-f-graph-problem-chains-avvis-5-th-a", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-b", FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"3-f-graph-problem-chains-avvis-5-th-c", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-d", FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-            {"3-f-graph-problem-chains-avvis-5-th-e", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-
-            {"f-graph-problem-chains-avvis-3-th-a",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-chains-avvis-3-th-b",   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-
-            {"scopes-mp-acq-acq-a",                   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"scopes-mp-acq-acq-b",                   FAIL,   FAIL,   FAIL,       PASS,   PASS,   PASS}, // TODO:
-    };
-
-    private static final Object[][] expectedNoChains = {
-            {"2-f-graph-avvis-chains-semav",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"2-f-graph-avvis-chains-semvis",         PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-
-            {"3-f-graph-problem-chains-avvis-5-th-a", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-b", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-c", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-d", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-e", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-
-            {"f-graph-problem-chains-avvis-3-th-a",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"f-graph-problem-chains-avvis-3-th-b",   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
-
-            {"scopes-mp-acq-acq-a",                   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-            {"scopes-mp-acq-acq-b",                   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
-    };
-
-    private static final Map<String, Map<String, List<Result>>> expected = new HashMap<>();
+/*
+f-graph-problem-avvis-mp-b
+f-graph-problem-avvis-mp-bb
+f-graph-mp3-b
+f-graph-mp3-bf
+f-graph-mp3-sc-af
+f-graph-mp3-sc-b
+f-graph-mp3-sc-b
+scopes-mp-acq-acq-b
+*/
+    private static final Map<String, Map<String, Map<String, Result>>> expected = new HashMap<>();
     static {
-        expected.put("chains", new HashMap<>());
-        expected.put("nochains", new HashMap<>());
-        for (String type : List.of("chains", "nochains")) {
-            for (Object[] o : expectedAll) {
-                expected.get(type).put((String) o[0], IntStream.range(1, o.length).boxed().map(i -> (Result) o[i]).toList());
+        try {
+            expected.put("chains", readFile("expected-chains"));
+            expected.put("nochains", readFile("expected-nochains"));
+            Map<String, Map<String, Result>> all = readFile("expected-all");
+            expected.get("chains").putAll(all);
+            expected.get("nochains").putAll(all);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Map<String, Map<String, Result>> readFile(String file) throws IOException {
+        file = getRootPath("litmus/VULKAN/pvmm/" + file + ".csv");
+        Map<String, Map<String, Result>> result = new HashMap<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String line = br.readLine();
+            assertNotNull(line);
+            String[] models = line.split(",");
+            while ((line = br.readLine()) != null) {
+                if (!line.isBlank()) {
+                    String[] values = line.split(",");
+                    if (values.length > 0) {
+                        Map<String, Result> data = new HashMap<>();
+                        for (int i = 1; i < values.length; i++) {
+                            data.put(models[i], Result.valueOf(values[i]));
+                        }
+                        result.put(values[0], data);
+                    }
+                }
             }
         }
-        for (Object[] o : expectedChains) {
-            expected.get("chains").put((String) o[0], IntStream.range(1, o.length).boxed().map(i -> (Result) o[i]).toList());
-        }
-        for (Object[] o : expectedNoChains) {
-            expected.get("nochains").put((String) o[0], IntStream.range(1, o.length).boxed().map(i -> (Result) o[i]).toList());
-        }
+        return result;
     }
 
     private final Printer printer = Printer.newInstance();
 
     @Test
     public void checkResult() throws Exception {
-        for (Map.Entry<String, Map<String, List<Result>>> typeEntry : expected.entrySet()) {
+        for (Map.Entry<String, Map<String, Map<String, Result>>> typeEntry : expected.entrySet()) {
             System.out.println(typeEntry.getKey());
-            for (Map.Entry<String, List<Result>> programEntry : typeEntry.getValue().entrySet()) {
+            for (Map.Entry<String, Map<String, Result>> programEntry : typeEntry.getValue().entrySet()) {
                 String program = getRootPath("litmus/VULKAN/pvmm/" + programEntry.getKey() + ".litmus");
                 System.out.println(program);
-                for (int i = 0; i < programEntry.getValue().size(); i++) {
-                    Result result = programEntry.getValue().get(i);
-                    String model = getRootPath("cat/" + models[i] + ".cat");
-                    System.out.println("    " + models[i]);
+                for (Map.Entry<String, Result> resultEntry : programEntry.getValue().entrySet()) {
+                    Result result = resultEntry.getValue();
+                    String model = getRootPath("cat/" + resultEntry.getKey() + ".cat");
+                    System.out.println("    " + resultEntry.getKey());
                     VerificationTask taskEager = mkTask(program, model, PROGRAM_SPEC, typeEntry.getKey());
                     try (ModelChecker mc = ModelChecker.create(taskEager, Method.EAGER)) {
                         mc.run();
@@ -200,16 +119,16 @@ public class PvmmTest {
 
     @Test
     public void logRelations() throws Exception {
-        for (Map.Entry<String, Map<String, List<Result>>> typeEntry : expected.entrySet()) {
-            for (Map.Entry<String, List<Result>> programEntry : typeEntry.getValue().entrySet()) {
+        for (Map.Entry<String, Map<String, Map<String, Result>>> typeEntry : expected.entrySet()) {
+            for (Map.Entry<String, Map<String, Result>> programEntry : typeEntry.getValue().entrySet()) {
                 String program = getRootPath("litmus/VULKAN/pvmm/" + programEntry.getKey() + ".litmus");
                 System.out.println(program);
-                for (int i = 0; i < programEntry.getValue().size(); i++) {
-                    Result result = programEntry.getValue().get(i);
-                    String modelPath = getRootPath("cat/" + models[i] + ".cat");
+                for (Map.Entry<String, Result> resultEntry : programEntry.getValue().entrySet()) {
+                    Result result = resultEntry.getValue();
+                    String modelPath = getRootPath("cat/" + resultEntry.getKey() + ".cat");
                     Property property = PROGRAM_SPEC;
                     if (result == FAIL) {
-                        modelPath = getRootPath("cat/" + models[i] + "_cycle.cat");
+                        modelPath = getRootPath("cat/" + resultEntry.getKey() + "_cycle.cat");
                         property = CAT_SPEC;
                     }
                     VerificationTask task = mkTask(program, modelPath, property, typeEntry.getKey());
@@ -220,7 +139,7 @@ public class PvmmTest {
                         Set<Relation> relations = task.getMemoryModel().getRelations();
                         Map<String, MutableEventGraph> data = extractRelationsData(task.getProgram(), relations, ra, mc.getProver().getModel());
                         data = translateEventIds(task.getProgram(), data);
-                        log(models[i], task.getProgram(), typeEntry.getKey(), data);
+                        log(resultEntry.getKey(), task.getProgram(), typeEntry.getKey(), data);
                     }
                 }
             }

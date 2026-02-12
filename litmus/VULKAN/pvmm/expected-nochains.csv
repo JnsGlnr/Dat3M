@@ -1,0 +1,16 @@
+test,vulkan_pvmm,vulkan_pvmm_semsc,vulkan_pvmm_locord,vulkan_pvmm_semsc_locord,vulkan_pvmm_semsc_locord_fence,vulkan_current_pvmm,vulkan_current_pvmm_semsc,vulkan_current_pvmm_locord,vulkan_current_pvmm_semsc_locord,vulkan_current_pvmm_semsc_locord_fence
+,,,,,,,,,,
+2-f-graph-avvis-chains-semav,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+2-f-graph-avvis-chains-semvis,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+,,,,,,,,,,
+3-f-graph-problem-chains-avvis-5-th-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+3-f-graph-problem-chains-avvis-5-th-b,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+3-f-graph-problem-chains-avvis-5-th-c,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+3-f-graph-problem-chains-avvis-5-th-d,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+3-f-graph-problem-chains-avvis-5-th-e,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+,,,,,,,,,,
+3-f-graph-problem-avvis-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+3-f-graph-problem-avvis-b,FAIL,FAIL,PASS,PASS,PASS,FAIL,FAIL,PASS,PASS,PASS
+,,,,,,,,,,
+scopes-mp-acq-acq-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+scopes-mp-acq-acq-b,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS

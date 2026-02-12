@@ -98,9 +98,8 @@ let sw = inscope & (
 
 let ithbsemsc(SC, SEMSC) = (ssw |
         ([SEMSC]; sw; [SEMSC]) |
-        ([F & SEMSC]; po ; [F & SEMSC]) |
-        ([SC]; po; [REL & SEMSC]) |
-        ([ACQ & SEMSC]; po; [SC])
+        ([SC | SEMSC]; po; [REL & SEMSC]) |
+        ([ACQ & SEMSC]; po; [SC | SEMSC])
     )+
 
 let ithbsemsc0 = ithbsemsc(SC0, SEMSC0)
@@ -147,16 +146,16 @@ let locord = loc &
              (  (hb & int & vloc) |
                 ([R \ PRIV]; hb; [(R | W) \ PRIV]) | // RaR, WaR (non-private)
                 ([R]; ssw+; [R | W]) | // RaR, WaR (any)
-                (vloc & ([W \ PRIV]; (po? & avvisinc); avsg; (hb & ssg);                          [W \ PRIV])) |   // WaW (via subgroup instance domain)
-                (vloc & ([W \ PRIV]; (po? & avvisinc); avsg; (hb & ssg); vissg; (po? & avvisinc); [R \ PRIV])) |   // RaW (via subgroup instance domain)
-                (vloc & ([W \ PRIV]; (po? & avvisinc); avwg; (hb & swg);                          [W \ PRIV])) |   // WaW (via subgroup instance domain)
-                (vloc & ([W \ PRIV]; (po? & avvisinc); avwg; (hb & swg); viswg; (po? & avvisinc); [R \ PRIV])) |   // RaW (via workgroup instance domain)
-                (vloc & ([W \ PRIV]; (po? & avvisinc); avqf; (hb & sqf);                          [W \ PRIV])) |   // WaW (via queue family instance domain)
-                (vloc & ([W \ PRIV]; (po? & avvisinc); avqf; (hb & sqf); visqf; (po? & avvisinc); [R \ PRIV])) |   // RaW (via queue family instance domain)
-                (vloc & ([W \ PRIV]; (po? & avvisinc); avsh; (hb);                                [W \ PRIV])) |   // WaW (via shader domain)
-                (vloc & ([W \ PRIV]; (po? & avvisinc); avsh; (hb);       vissh; (po? & avvisinc); [R \ PRIV])) |   // RaW (via shader domain)
-                (       ([W];        (hb & avvisinc);  avdv; (hb);                                [W]))        |   // WaW (via device domain)
-                (       ([W];        (hb & avvisinc);  avdv; (hb);       visdv; (hb & avvisinc);  [R]))            // RaW (via device domain)
+                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); avsg; (hb & ssg);                          [W \ PRIV])) |   // WaW (via subgroup instance domain)
+                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); avsg; (hb & ssg); vissg; (po? & avvisinc); [R \ PRIV])) |   // RaW (via subgroup instance domain)
+                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); avwg; (hb & swg);                          [W \ PRIV])) |   // WaW (via subgroup instance domain)
+                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); avwg; (hb & swg); viswg; (po? & avvisinc); [R \ PRIV])) |   // RaW (via workgroup instance domain)
+                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); avqf; (hb & sqf);                          [W \ PRIV])) |   // WaW (via queue family instance domain)
+                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); avqf; (hb & sqf); visqf; (po? & avvisinc); [R \ PRIV])) |   // RaW (via queue family instance domain)
+                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); avsh; (hb);                                [W \ PRIV])) |   // WaW (via shader domain)
+                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); avsh; (hb);       vissh; (po? & avvisinc); [R \ PRIV])) |   // RaW (via shader domain)
+                (       hb & ([W];        (hb & avvisinc);  avdv; (hb);                                [W]))        |   // WaW (via device domain)
+                (       hb & ([W];        (hb & avvisinc);  avdv; (hb);       visdv; (hb & avvisinc);  [R]))            // RaW (via device domain)
              )
 
 // From-read is defined based on scoped modification order
@@ -173,7 +172,9 @@ let fre = fr & ext
 (***********************)
 
 // locord, rf, fr, asmo must not form cycles
-acyclic (locord | rf | fr | asmo) as consistency-cycle
+// acyclic (locord | rf | fr | asmo) as consistency-cycle
+let cycle = id & ((locord | rf | fr | asmo)+)
+flag ~empty cycle
 
 // non-atomic cannot read-from a value that is shadowed by another write
 empty (rf; ([R \ ATOM])) & (([W]; locord); ([W]; locord)+) as consistency-rf
