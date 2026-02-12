@@ -48,8 +48,10 @@ public class PvmmTest {
 
     private static final String[] models = {
             "vulkan_pvmm",
+            "vulkan_pvmm_semsc",
             "vulkan_pvmm_semsc_fence",
             "vulkan_current_pvmm",
+            "vulkan_current_pvmm_semsc",
             "vulkan_current_pvmm_semsc_fence",
     };
 
@@ -57,97 +59,97 @@ public class PvmmTest {
                                                       // orig             // current
             // test                                   base    semsc       base    semsc
 
-            {"2-f-graph-mp-semsc-a",                  FAIL,   FAIL,       FAIL,   FAIL},
-            {"2-f-graph-mp-semsc-b",                  PASS,   PASS,       PASS,   PASS},
-            {"2-f-graph-mp-semsc-c",                  FAIL,   FAIL,       FAIL,   FAIL},
+            {"2-f-graph-mp-semsc-a",                  FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"2-f-graph-mp-semsc-b",                  PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"2-f-graph-mp-semsc-c",                  FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
 
-            {"2-f-graph-mp-avvis-a",                  PASS,   PASS,       PASS,   PASS},
-            {"2-f-graph-mp-avvis-b",                  FAIL,   FAIL,       FAIL,   FAIL},
+            {"2-f-graph-mp-avvis-a",                  PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"2-f-graph-mp-avvis-b",                  FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
 
-            {"3-f-graph-problem-semsc-mp-a",          PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-semsc-mp-b",          FAIL,   PASS,       FAIL,   PASS},
-            {"3-f-graph-problem-semsc-mp-c",          PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-semsc-mp-fences-a",   PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-semsc-mp-fences-b",   FAIL,   PASS,       FAIL,   PASS},
-            {"3-f-graph-problem-semsc-mp-fences-c",   PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-semsc-lb-a",          PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-semsc-lb-b",          FAIL,   PASS,       FAIL,   PASS},
-            {"3-f-graph-problem-semsc-lb-c",          FAIL,   PASS,       FAIL,   PASS},
-            {"3-f-graph-problem-semsc-lb-c-acqrel",   FAIL,   PASS,       FAIL,   PASS},
-            {"3-f-graph-problem-semsc-lb-d",          PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-semsc-lb-d-acqrel",   PASS,   PASS,       PASS,   PASS},
+            {"3-f-graph-problem-semsc-mp-a",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-mp-b",          FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-mp-c",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-mp-fences-a",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-mp-fences-b",   FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-mp-fences-c",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-lb-a",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-lb-b",          FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-lb-c",          FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-lb-c-acqrel",   FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-lb-d",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-semsc-lb-d-acqrel",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
 
-            {"f-graph-problem-avvis-mp-a",            PASS,   PASS,       PASS,   PASS},
-            {"f-graph-problem-avvis-mp-b",            FAIL,   FAIL,       FAIL,   FAIL},
-            {"f-graph-problem-avvis-mp-c",            FAIL,   FAIL,       FAIL,   FAIL},
-            {"f-graph-problem-avvis-mp-d",            PASS,   PASS,       PASS,   PASS},
-            {"f-graph-problem-avvis-mp-e",            FAIL,   FAIL,       FAIL,   FAIL},
-            {"f-graph-problem-avvis-mp-f",            PASS,   PASS,       PASS,   PASS},
-            {"f-graph-problem-avvis-mp-g",            FAIL,   FAIL,       FAIL,   FAIL},
-            {"f-graph-problem-avvis-mp-aa",           PASS,   PASS,       PASS,   PASS},
-            {"f-graph-problem-avvis-mp-bb",           FAIL,   FAIL,       FAIL,   FAIL},
+            {"f-graph-problem-avvis-mp-a",            PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-avvis-mp-b",            FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL}, // TODO:
+            {"f-graph-problem-avvis-mp-c",            FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"f-graph-problem-avvis-mp-d",            PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-avvis-mp-e",            FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"f-graph-problem-avvis-mp-f",            PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-avvis-mp-g",            FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"f-graph-problem-avvis-mp-aa",           PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-avvis-mp-bb",           FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL}, // TODO:
 
-            {"f-graph-mp3-a",                         FAIL,   PASS,       FAIL,   PASS},
-            {"f-graph-mp3-af",                        FAIL,   FAIL,       FAIL,   FAIL},
-            {"f-graph-mp3-b",                         FAIL,   PASS,       FAIL,   PASS}, // TODO:
-            {"f-graph-mp3-bf",                        FAIL,   FAIL,       FAIL,   FAIL},
+            {"f-graph-mp3-a",                         FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
+            {"f-graph-mp3-af",                        FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL},
+            {"f-graph-mp3-b",                         FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS}, // TODO:
+            {"f-graph-mp3-bf",                        FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL}, // TODO:
 
-            {"f-graph-mp3-sc-a",                      FAIL,   PASS,       FAIL,   PASS},
-            {"f-graph-mp3-sc-af",                     FAIL,   FAIL,       FAIL,   FAIL}, // TODO:
-            {"f-graph-mp3-sc-b",                      FAIL,   PASS,       FAIL,   PASS}, // TODO:
-            {"f-graph-mp3-sc-b",                      FAIL,   PASS,       FAIL,   PASS}, // TODO:
+            {"f-graph-mp3-sc-a",                      FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
+            {"f-graph-mp3-sc-af",                     FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL}, // TODO:
+            {"f-graph-mp3-sc-b",                      FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS}, // TODO:
+            {"f-graph-mp3-sc-b",                      FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS}, // TODO:
 
-            {"extra-sb",                              PASS,   PASS,       PASS,   PASS},
-            {"extra-sb-fence",                        PASS,   PASS,       PASS,   PASS},
-            {"extra-lb",                              FAIL,   FAIL,       FAIL,   FAIL},
-            {"extra-lb-fence-1",                      FAIL,   FAIL,       FAIL,   FAIL},
-            {"extra-lb-fence-2",                      FAIL,   FAIL,       FAIL,   FAIL},
-            {"extra-mp3",                             FAIL,   FAIL,       FAIL,   FAIL},
-            {"extra-mp3-fence1",                      FAIL,   FAIL,       FAIL,   FAIL},
-            {"extra-mp3-fence2",                      PASS,   PASS,       PASS,   PASS},
-            {"extra-mp-plus-fence",                   PASS,   PASS,       PASS,   PASS},
-            {"extra-mp-plus",                         PASS,   PASS,       PASS,   PASS},
-            {"extra-lb-plus",                         PASS,   PASS,       PASS,   PASS},
+            {"extra-sb",                              PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"extra-sb-fence",                        PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"extra-lb",                              FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"extra-lb-fence-1",                      FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"extra-lb-fence-2",                      FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"extra-mp3",                             FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"extra-mp3-fence1",                      FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL},
+            {"extra-mp3-fence2",                      PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"extra-mp-plus-fence",                   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"extra-mp-plus",                         PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"extra-lb-plus",                         PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
 
-            {"mp3transitive3",                        FAIL,   PASS,       FAIL,   PASS},
-            {"mp3transitive3-fence",                  FAIL,   FAIL,       FAIL,   FAIL},
+            {"mp3transitive3",                        FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
+            {"mp3transitive3-fence",                  FAIL,   PASS,   FAIL,       FAIL,   PASS,   FAIL},
 
-            {"old_f-graph-problem3-a",                FAIL,   PASS,       FAIL,   PASS},
-            {"old_f-graph-problem3-b",                PASS,   PASS,       PASS,   PASS},
+            {"old_f-graph-problem3-a",                FAIL,   PASS,   PASS,       FAIL,   PASS,   PASS},
+            {"old_f-graph-problem3-b",                PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
     };
 
     private static final Object[][] expectedChains = {
-            {"2-f-graph-avvis-chains-semav",          FAIL,   FAIL,       FAIL,   FAIL},
-            {"2-f-graph-avvis-chains-semvis",         FAIL,   FAIL,       FAIL,   FAIL},
+            {"2-f-graph-avvis-chains-semav",          FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"2-f-graph-avvis-chains-semvis",         FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
 
-            {"3-f-graph-problem-chains-avvis-5-th-a", PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-b", FAIL,   FAIL,       FAIL,   FAIL},
-            {"3-f-graph-problem-chains-avvis-5-th-c", PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-d", FAIL,   FAIL,       FAIL,   FAIL},
-            {"3-f-graph-problem-chains-avvis-5-th-e", PASS,   PASS,       PASS,   PASS},
+            {"3-f-graph-problem-chains-avvis-5-th-a", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-chains-avvis-5-th-b", FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"3-f-graph-problem-chains-avvis-5-th-c", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-chains-avvis-5-th-d", FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
+            {"3-f-graph-problem-chains-avvis-5-th-e", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
 
-            {"f-graph-problem-chains-avvis-3-th-a",   PASS,   PASS,       PASS,   PASS},
-            {"f-graph-problem-chains-avvis-3-th-b",   FAIL,   FAIL,       FAIL,   FAIL},
+            {"f-graph-problem-chains-avvis-3-th-a",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-3-th-b",   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
 
-            {"scopes-mp-acq-acq-a",                   PASS,   PASS,       PASS,   PASS},
-            {"scopes-mp-acq-acq-b",                   FAIL,   FAIL,       PASS,   PASS},
+            {"scopes-mp-acq-acq-a",                   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"scopes-mp-acq-acq-b",                   FAIL,   FAIL,   FAIL,       PASS,   PASS,   PASS}, // TODO:
     };
 
     private static final Object[][] expectedNoChains = {
-            {"2-f-graph-avvis-chains-semav",          PASS,   PASS,       PASS,   PASS},
-            {"2-f-graph-avvis-chains-semvis",         PASS,   PASS,       PASS,   PASS},
+            {"2-f-graph-avvis-chains-semav",          PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"2-f-graph-avvis-chains-semvis",         PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
 
-            {"3-f-graph-problem-chains-avvis-5-th-a", PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-b", PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-c", PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-d", PASS,   PASS,       PASS,   PASS},
-            {"3-f-graph-problem-chains-avvis-5-th-e", PASS,   PASS,       PASS,   PASS},
+            {"3-f-graph-problem-chains-avvis-5-th-a", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-chains-avvis-5-th-b", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-chains-avvis-5-th-c", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-chains-avvis-5-th-d", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"3-f-graph-problem-chains-avvis-5-th-e", PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
 
-            {"f-graph-problem-chains-avvis-3-th-a",   PASS,   PASS,       PASS,   PASS},
-            {"f-graph-problem-chains-avvis-3-th-b",   FAIL,   FAIL,       FAIL,   FAIL},
+            {"f-graph-problem-chains-avvis-3-th-a",   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"f-graph-problem-chains-avvis-3-th-b",   FAIL,   FAIL,   FAIL,       FAIL,   FAIL,   FAIL},
 
-            {"scopes-mp-acq-acq-a",                   PASS,   PASS,       PASS,   PASS},
-            {"scopes-mp-acq-acq-b",                   PASS,   PASS,       PASS,   PASS},
+            {"scopes-mp-acq-acq-a",                   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
+            {"scopes-mp-acq-acq-b",                   PASS,   PASS,   PASS,       PASS,   PASS,   PASS},
     };
 
     private static final Map<String, Map<String, List<Result>>> expected = new HashMap<>();
