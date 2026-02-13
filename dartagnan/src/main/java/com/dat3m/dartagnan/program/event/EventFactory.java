@@ -28,13 +28,13 @@ import com.dat3m.dartagnan.program.event.core.*;
 import com.dat3m.dartagnan.program.event.core.annotations.FunCallMarker;
 import com.dat3m.dartagnan.program.event.core.annotations.FunReturnMarker;
 import com.dat3m.dartagnan.program.event.core.annotations.StringAnnotation;
-import com.dat3m.dartagnan.program.event.core.InstructionBoundary;
 import com.dat3m.dartagnan.program.event.core.special.StateSnapshot;
 import com.dat3m.dartagnan.program.event.core.threading.*;
 import com.dat3m.dartagnan.program.event.functions.AbortIf;
 import com.dat3m.dartagnan.program.event.functions.Return;
 import com.dat3m.dartagnan.program.event.functions.ValueFunctionCall;
 import com.dat3m.dartagnan.program.event.functions.VoidFunctionCall;
+import com.dat3m.dartagnan.program.event.lang.GenericRMWReturn;
 import com.dat3m.dartagnan.program.event.lang.catomic.*;
 import com.dat3m.dartagnan.program.event.lang.dat3m.*;
 import com.dat3m.dartagnan.program.event.lang.linux.*;
@@ -484,6 +484,18 @@ public class EventFactory {
             return new LlvmCmpXchg(oldValueRegister, cmpRegister, address, expectedAddr, desiredValue, mo, isStrong);
         }
 
+        public static Event newCompareExchangeAlt(Register resultRegister, Expression address, Expression expectedValue, Expression desiredValue, String mo, boolean isStrong) {
+            final Expression hole = expressions.makeHole(desiredValue.getType());
+            final Expression cond = expressions.makeEQ(hole, expectedValue);
+            final Expression storeVal = desiredValue;
+            final Expression retVal = expressions.makeConstruct(types.getAggregateType(
+                    List.of(expectedValue.getType(), types.getIntegerType(1))),
+                    List.of(hole, expressions.makeCast(cond, types.getIntegerType(1)))
+            );
+
+            return new GenericRMWReturn(resultRegister, address, storeVal, cond, retVal, mo);
+        }
+
         public static LlvmCmpXchg newCompareExchange(Register oldValueRegister, Register cmpRegister, Expression address, Expression expectedAddr, Expression desiredValue, String mo) {
             return newCompareExchange(oldValueRegister, cmpRegister, address, expectedAddr, desiredValue, mo, false);
         }
@@ -491,6 +503,16 @@ public class EventFactory {
         public static LlvmRMW newRMW(Register register, Expression address, Expression value, IntBinaryOp op, String mo) {
             return new LlvmRMW(register, address, op, value, mo);
         }
+
+        public static Event newRMWAlt(Register register, Expression address, Expression value, IntBinaryOp op, String mo) {
+            final Expression hole = expressions.makeHole(value.getType());
+            final Expression cond = null;
+            final Expression storeVal = expressions.makeIntBinary(hole, op, value);
+            final Expression retVal = hole;
+
+            return new GenericRMWReturn(register, address, storeVal, cond, retVal, mo);
+        }
+
 
         public static LlvmFence newFence(String mo) {
             return new LlvmFence(mo);
