@@ -140,22 +140,24 @@ let visqf = [VISQF]; (hbchains & (((hb & swg & avvisinc) ; viswg)?; ((hb & ssg &
 let vissh = [VISSHADER]; (hbchains & (((hb & sqf & avvisinc) ; visqf)?; ((hb & swg & avvisinc); viswg)?; ((hb & ssg & avvisinc); vissg)?))
 let visdv = [VISDEVICE]
 
-// loc order, relates memory accesses to the same location
-let locord = loc &
-             (  (hb & int & vloc) |
-                ([R \ PRIV]; hb; [(R | W) \ PRIV]) | // RaR, WaR (non-private)
-                ([R]; ssw+; [R | W]) | // RaR, WaR (any)
-                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); (hb & (avsg; (hb & ssg)));                          [W \ PRIV])) |   // WaW (via subgroup instance domain)
-                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); (hb & (hb & ((hb & (avsg; (hb & ssg))); vissg)); (po? & avvisinc); [R \ PRIV]))) |   // RaW (via subgroup instance domain)
-                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); (hb & (avwg; (hb & swg)));                          [W \ PRIV])) |   // WaW (via subgroup instance domain)
-                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); (hb & (hb & ((hb & (avwg; (hb & swg))); viswg)); (po? & avvisinc); [R \ PRIV]))) |   // RaW (via workgroup instance domain)
-                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); (hb & (avqf; (hb & sqf)));                          [W \ PRIV])) |   // WaW (via queue family instance domain)
-                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); (hb & (hb & ((hb & (avqf; (hb & sqf))); visqf)); (po? & avvisinc); [R \ PRIV]))) |   // RaW (via queue family instance domain)
-                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); (hb & (avsh; hb));                                [W \ PRIV])) |   // WaW (via shader domain)
-                (vloc & hb & ([W \ PRIV]; (po? & avvisinc); (hb & (hb & ((hb & (avsh; hb));       vissh)); (po? & avvisinc); [R \ PRIV]))) |   // RaW (via shader domain)
-                (       hb & ([W];        (hb & avvisinc);  (hb & (avdv; hb));                                [W]))        |   // WaW (via device domain)
-                (       hb & ([W];        (hb & avvisinc);  (hb & (hb & ((hb & (avdv; hb));       visdv)); (hb & avvisinc);  [R])))            // RaW (via device domain)
-             )
+// location order, relates memory accesses to the same location
+let flocord(TAG, ord, av, scope, vis) = (
+    (hb & ([W & TAG]; (ord & avvisinc); (hb & (av; (hb & scope))); [W & TAG])) |
+    (hb & ([W & TAG]; (ord & avvisinc); (hb & ((hb & ((hb & (av; (hb & scope))); vis)); (ord & avvisinc))); [R & TAG]))
+)
+
+let locord = loc & (
+    ([R]; ssw+; [R | W]) |
+    ([R & NONPRIV]; hb; [(R | W) & NONPRIV]) |
+    flocord(M, hb, avdv, hb, visdv) |
+    vloc & (
+        (hb & int) |
+        flocord(NONPRIV, po?, avsg, ssg, vissg) |
+        flocord(NONPRIV, po?, avwg, swg, viswg) |
+        flocord(NONPRIV, po?, avqf, sqf, visqf) |
+        flocord(NONPRIV, po?, avsh, hb, vissh)
+    )
+)
 
 // From-read is defined based on scoped modification order
 // instead of coherence. For reads that read-from init, they
