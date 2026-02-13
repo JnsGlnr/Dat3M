@@ -234,7 +234,7 @@ class VisitorIMM extends VisitorBase {
             condJump = newJumpUnless(cond, condEnd);
         } else {
             label = newLabel("FakeDep");
-            fakeCtrlDep = newFakeCtrlDep(resultRegister, label);
+            fakeCtrlDep = newFakeCtrlDep(loadReg, label);
         }
 
         Load load = newRMWLoadExclusiveWithMo(loadReg, address, Tag.IMM.extractLoadMo(mo));
