@@ -22,7 +22,6 @@ import com.dat3m.dartagnan.wmm.Wmm;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
@@ -172,7 +171,7 @@ public class PropertyEncoder implements Encoder {
         return bmgr.and(progSpec.trackingLiteral, progSpec.trackedFormula);
     }
 
-    private BooleanFormula encodeLastCoConstraints() {
+    public BooleanFormula encodeLastCoConstraints() {
         final Relation co = memoryModel.getRelation(CO);
         final EncodingContext.EdgeEncoder coEncoder = context.edge(co);
         final RelationAnalysis.Knowledge knowledge = ra.getKnowledge(co);

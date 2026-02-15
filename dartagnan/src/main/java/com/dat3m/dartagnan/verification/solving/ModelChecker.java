@@ -25,7 +25,6 @@ import com.dat3m.dartagnan.wmm.Wmm;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.analysis.WmmAnalysis;
 import com.dat3m.dartagnan.wmm.processing.WmmProcessingManager;
-
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -252,6 +251,7 @@ public abstract class ModelChecker implements AutoCloseable {
         return switch (method) {
             case EAGER -> AssumeSolver.create(task);
             case LAZY -> RefinementSolver.create(task);
+            case EXPLORE -> EnumerationSolver.create(task);
         };
     }
 }
