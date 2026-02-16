@@ -21,6 +21,7 @@ import com.dat3m.dartagnan.program.event.functions.FunctionCall;
 import com.dat3m.dartagnan.program.event.functions.ValueFunctionCall;
 import com.dat3m.dartagnan.program.event.lang.svcomp.BeginAtomic;
 import com.dat3m.dartagnan.program.memory.MemoryObject;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1435,18 +1436,30 @@ public class Intrinsics {
     // --------------------------------------------------------------------------------------------------------
     // C26 atomics
 
+    private enum COp {
+        // WARNING: The order here must match with the enum defined in c26.h
+        C_ADD(IntBinaryOp.ADD),
+        C_SUB(IntBinaryOp.SUB),
+        C_AND(IntBinaryOp.AND),
+        C_OR(IntBinaryOp.OR),
+        C_XOR(IntBinaryOp.XOR),
+        C_MIN(IntBinaryOp.SMIN),
+        C_MAX(IntBinaryOp.SMAX);
+
+        private final IntBinaryOp op;
+        COp(IntBinaryOp op) {
+            this.op = op;
+        }
+    }
+
     private IntBinaryOp toCOp(Expression opCode) {
         if (!(opCode instanceof IntLiteral literal)) {
             throw new UnsupportedOperationException("Variable op code \"" + opCode + "\"");
         }
-        return switch (literal.getValueAsInt()) {
-            case 0 -> IntBinaryOp.ADD;
-            case 1 -> IntBinaryOp.SUB;
-            case 2 -> IntBinaryOp.AND;
-            case 3 -> IntBinaryOp.OR;
-            case 4 -> IntBinaryOp.XOR;
-            default -> throw new UnsupportedOperationException("Operation \"" + literal.getValueAsInt() + "\" not yet supported");
-        };
+        final COp[] cOps = COp.values();
+        final int index = literal.getValue().intValueExact();
+        Preconditions.checkArgument(0 <= index && index < cOps.length, "Invalid op code %s", opCode);
+        return cOps[index].op;
     }
 
     private String toCMemoryOrder(Expression moCode) {

@@ -31,3 +31,7 @@ C11StoreXorExplicit          :   'atomic_store_xor_explicit';
 C11StoreXor                  :   'atomic_store_xor';
 C11StoreAndExplicit          :   'atomic_store_and_explicit';
 C11StoreAnd                  :   'atomic_store_and';
+C11StoreMinExplicit          :   'atomic_store_min_explicit';
+C11StoreMin                  :   'atomic_store_min';
+C11StoreMaxExplicit          :   'atomic_store_max_explicit';
+C11StoreMax                  :   'atomic_store_max';
