@@ -97,11 +97,11 @@ public class VisitorC11 extends VisitorBase {
         String mo = e.getMo();
 
         Register dummyReg = e.getFunction().newRegister(e.getAccessType());
-        Load load = newRMWLoad(dummyReg, address);
+        Load load = newRMWLoad(dummyReg, address););
         Local localOp = newLocal(dummyReg, expressions.makeIntBinary(dummyReg, e.getOperator(), e.getOperand()));
         RMWStore store = newRMWStoreWithMo(load, address, dummyReg, Tag.C11.storeMO(mo));
 
-        load.addTags(Tag.C11.NORETURN);
+        load.addTags(C11.ATOMIC, Tag.C11.NORETURN); // Note that the load has no mo, but is still atomic!
         store.addTags(Tag.C11.NORETURN);
 
         return tagList(e, eventSequence(
