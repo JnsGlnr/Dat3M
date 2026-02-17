@@ -97,7 +97,7 @@ public class VisitorC11 extends VisitorBase {
         String mo = e.getMo();
 
         Register dummyReg = e.getFunction().newRegister(e.getAccessType());
-        Load load = newRMWLoad(dummyReg, address););
+        Load load = newRMWLoad(dummyReg, address);
         Local localOp = newLocal(dummyReg, expressions.makeIntBinary(dummyReg, e.getOperator(), e.getOperand()));
         RMWStore store = newRMWStoreWithMo(load, address, dummyReg, Tag.C11.storeMO(mo));
 
