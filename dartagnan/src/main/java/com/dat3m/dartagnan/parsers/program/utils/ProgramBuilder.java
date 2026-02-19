@@ -27,6 +27,7 @@ import com.google.common.collect.Iterables;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -137,6 +138,10 @@ public class ProgramBuilder {
 
     // ----------------------------------------------------------------------------------------------------------------
     // Threads and Functions
+
+    public Set<Integer> getThreadIds() {
+        return id2FunctionsMap.keySet();
+    }
 
     // This method creates a "default" thread that has no parameters, no return value, and runs unconditionally.
     // It is only useful for creating threads of Litmus code.

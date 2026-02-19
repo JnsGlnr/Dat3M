@@ -16,12 +16,22 @@ variableDeclaratorList
 
 variableDeclarator
     :   type location (Equals constant)? #typedVariableDeclarator
-    |   type location LBracket constant RBracket #typedArrayDeclarator
+    |   type location LBracket constant RBracket (Equals initArray)? #typedArrayDeclarator
     |   location Equals constant #variableDeclaratorLocation
     |   location Equals Amp? location #variableDeclaratorLocationLocation
     |   type threadId Colon register64 (Equals constant)? #typedRegisterDeclarator
     |   threadId Colon register64 Equals constant #variableDeclaratorRegister
     |   threadId Colon register64 Equals Amp? location #variableDeclaratorRegisterLocation
+    |   type Identifier Equals location #variableSymbolicDeclaratorRegisterLocation
+    ;
+
+initArray
+    :   LBrace arrayElement* (Comma arrayElement)* RBrace
+    ;
+
+arrayElement
+    :   constant
+    |   Ast? (Amp? location | LPar Amp? location RPar)
     ;
 
 type
@@ -366,6 +376,7 @@ expr32
 
 address
     :   register64 (Comma offset)?
+    |   'X' Identifier
     ;
 
 offset
@@ -404,7 +415,7 @@ register32 returns[String id]
     ;
 
 location
-    :   Identifier
+    :   Period? Identifier
     |   LBracket Identifier RBracket
     ;
 
@@ -428,6 +439,7 @@ Hexa
 
 Ret
     :   'ret'
+    |   'RET'
     ;
 
 Nop
@@ -684,6 +696,7 @@ CASALH :   'CASALH' ;
 
 MovInstruction
     :   'MOV'
+    |   'MOVZ'
     ;
 
 CmpInstruction
