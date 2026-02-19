@@ -98,8 +98,8 @@ let sw = inscope & (
 
 let ithbsemsc(SC, SEMSC) = (ssw |
         ([SEMSC]; sw; [SEMSC]) |
-        ([SC]; po; [REL & SEMSC]) |
-        ([ACQ & SEMSC]; po; [SC])
+        ([SC & NONPRIV]; po; [REL & SEMSC]) |
+        ([ACQ & SEMSC]; po; [SC & NONPRIV])
     )+
 
 let ithbsemsc0 = ithbsemsc(SC0, SEMSC0)

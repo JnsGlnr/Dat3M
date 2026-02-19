@@ -96,8 +96,8 @@ let sw = inscope & (
 let ithbsemsc(SC, SEMSC) = (ssw |
         ([SEMSC]; sw; [SEMSC]) |
         ([F & SEMSC]; po ; [F & SEMSC]) |
-        ([SC]; po; [REL & SEMSC]) |
-        ([ACQ & SEMSC]; po; [SC])
+        ([SC & NONPRIV]; po; [REL & SEMSC]) |
+        ([ACQ & SEMSC]; po; [SC & NONPRIV])
     )+
 
 let ithbsemsc0 = ithbsemsc(SC0, SEMSC0)
@@ -177,9 +177,7 @@ let fre = fr & ext
 (***********************)
 
 // locord, rf, fr, asmo must not form cycles
-// acyclic (locord | rf | fr | asmo) as consistency-cycle
-let cycle = id & ((locord | rf | fr | asmo)+)
-flag ~empty cycle
+acyclic (locord | rf | fr | asmo) as consistency-cycle
 
 // non-atomic cannot read-from a value that is shadowed by another write
 empty (rf; ([R \ ATOM])) & (([W]; locord); ([W]; locord)+) as consistency-rf
