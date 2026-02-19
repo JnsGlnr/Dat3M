@@ -1,4 +1,4 @@
-test,vulkan_pvmm,vulkan_pvmm_locord_wrong_1,vulkan_pvmm_locord_wrong_2,vulkan_pvmm_semsc,vulkan_pvmm_semsc_nonpriv,vulkan_pvmm_chains1,vulkan_pvmm_chains2,vulkan_pvmm_chains3,vulkan_pvmm_locord,vulkan_pvmm_semsc_locord,vulkan_pvmm_semsc_locord_fence,vulkan_current_pvmm,vulkan_current_pvmm_locord_wrong_1,vulkan_current_pvmm_locord_wrong_2,vulkan_current_pvmm_semsc,vulkan_current_pvmm_semsc_nonpriv,vulkan_current_pvmm_chains1,vulkan_current_pvmm_chains2,vulkan_current_pvmm_chains3,vulkan_current_pvmm_locord,vulkan_current_pvmm_semsc_locord,vulkan_current_pvmm_semsc_locord_fence
+test,vulkan_pvmm,vulkan_pvmm_semsc,vulkan_pvmm_semsc_nonpriv,vulkan_pvmm_chains1,vulkan_pvmm_chains2,vulkan_pvmm_chains3,vulkan_pvmm_locord_wrong_1,vulkan_pvmm_locord_wrong_2,vulkan_pvmm_locord,vulkan_pvmm_semsc_locord,vulkan_pvmm_semsc_locord_fence,vulkan_current_pvmm,vulkan_current_pvmm_semsc,vulkan_current_pvmm_semsc_nonpriv,vulkan_current_pvmm_chains1,vulkan_current_pvmm_chains2,vulkan_current_pvmm_chains3,vulkan_current_pvmm_locord_wrong_1,vulkan_current_pvmm_locord_wrong_2,vulkan_current_pvmm_locord,vulkan_current_pvmm_semsc_locord,vulkan_current_pvmm_semsc_locord_fence
 ,,,,,,,,,,,,,,,,,,,,,,
 2-f-graph-avvis-chains-semav,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 2-f-graph-avvis-chains-semvis,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
@@ -10,8 +10,8 @@ test,vulkan_pvmm,vulkan_pvmm_locord_wrong_1,vulkan_pvmm_locord_wrong_2,vulkan_pv
 3-f-graph-problem-chains-avvis-5-th-e,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 ,,,,,,,,,,,,,,,,,,,,,,
 3-f-graph-problem-avvis-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
-3-f-graph-problem-avvis-b,FAIL,PASS,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS,PASS,PASS,FAIL,PASS,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS,PASS,PASS
-3-f-graph-problem-avvis-c,FAIL,PASS,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS,PASS,PASS,FAIL,PASS,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS,PASS,PASS
+3-f-graph-problem-avvis-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS,PASS,PASS,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS,PASS,PASS
+3-f-graph-problem-avvis-c,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS,PASS,PASS,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS,PASS,PASS
 ,,,,,,,,,,,,,,,,,,,,,,
 4-chains-fix-locord,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 4-chains-fix-locord-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
