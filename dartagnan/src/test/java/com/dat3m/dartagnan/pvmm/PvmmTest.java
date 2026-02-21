@@ -16,6 +16,10 @@ import com.dat3m.dartagnan.verification.solving.ModelChecker;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.Wmm;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
+import com.dat3m.dartagnan.wmm.axiom.Axiom;
+import com.dat3m.dartagnan.wmm.axiom.Emptiness;
+import com.dat3m.dartagnan.wmm.definition.Intersection;
+import com.dat3m.dartagnan.wmm.definition.TransitiveClosure;
 import com.dat3m.dartagnan.wmm.utils.graph.mutable.MapEventGraph;
 import com.dat3m.dartagnan.wmm.utils.graph.mutable.MutableEventGraph;
 import org.junit.Test;
@@ -33,6 +37,7 @@ import static com.dat3m.dartagnan.configuration.Property.CAT_SPEC;
 import static com.dat3m.dartagnan.configuration.Property.PROGRAM_SPEC;
 import static com.dat3m.dartagnan.utils.ResourceHelper.getRootPath;
 import static com.dat3m.dartagnan.utils.Result.FAIL;
+import static com.dat3m.dartagnan.wmm.RelationNameRepository.ID;
 import static java.util.stream.Collectors.toMap;
 import static org.junit.Assert.*;
 
@@ -43,16 +48,6 @@ public class PvmmTest {
             "nochains", Path.of(getRootPath("cat/nochains"))
     );
 
-/*
-f-graph-problem-avvis-mp-b
-f-graph-problem-avvis-mp-bb
-f-graph-mp3-b
-f-graph-mp3-bf
-f-graph-mp3-sc-af
-f-graph-mp3-sc-b
-f-graph-mp3-sc-b
-scopes-mp-acq-acq-b
-*/
     private static final Map<String, Map<String, Map<String, Result>>> expected = new HashMap<>();
     static {
         try {
@@ -102,12 +97,13 @@ scopes-mp-acq-acq-b
                     Result result = resultEntry.getValue();
                     String model = getRootPath("cat/" + resultEntry.getKey() + ".cat");
                     System.out.println("    " + resultEntry.getKey());
-                    VerificationTask taskEager = mkTask(program, model, PROGRAM_SPEC, typeEntry.getKey());
+                    Wmm mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(model));
+                    VerificationTask taskEager = mkTask(program, mcm, PROGRAM_SPEC);
                     try (ModelChecker mc = ModelChecker.create(taskEager, Method.EAGER)) {
                         mc.run();
                         assertEquals(result, mc.getResult());
                     }
-                    VerificationTask taskLazy = mkTask(program, model, PROGRAM_SPEC, typeEntry.getKey());
+                    VerificationTask taskLazy = mkTask(program, mcm, PROGRAM_SPEC);
                     try (ModelChecker mc = ModelChecker.create(taskLazy, Method.LAZY)) {
                         mc.run();
                         assertEquals(result, mc.getResult());
@@ -126,12 +122,19 @@ scopes-mp-acq-acq-b
                 for (Map.Entry<String, Result> resultEntry : programEntry.getValue().entrySet()) {
                     Result result = resultEntry.getValue();
                     String modelPath = getRootPath("cat/" + resultEntry.getKey() + ".cat");
+                    Wmm mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(modelPath));
                     Property property = PROGRAM_SPEC;
                     if (result == FAIL) {
-                        modelPath = getRootPath("cat/" + resultEntry.getKey() + "_cycle.cat");
+                        removeAxiom(mcm, "racy");
+                        Axiom axiomCycle = removeAxiom(mcm, "consistency-cycle");
+                        Relation transitive = mcm.addDefinition(new TransitiveClosure(mcm.newRelation(), axiomCycle.getRelation()));
+                        Relation cycle = mcm.addDefinition(new Intersection(mcm.newRelation("cycle"), mcm.getRelation(ID), transitive));
+                        mcm.addConstraint(new Emptiness(cycle, true, true));
+                        Axiom axiomRf = removeAxiom(mcm, "consistency-rf");
+                        mcm.addConstraint(new Emptiness(axiomRf.getRelation(), true, true));
                         property = CAT_SPEC;
                     }
-                    VerificationTask task = mkTask(program, modelPath, property, typeEntry.getKey());
+                    VerificationTask task = mkTask(program, mcm, property);
                     try (ModelChecker mc = ModelChecker.create(task, Method.EAGER)) {
                         mc.run();
                         assertTrue(mc.hasModel());
@@ -144,6 +147,16 @@ scopes-mp-acq-acq-b
                 }
             }
         }
+    }
+
+    private Axiom removeAxiom(Wmm wmm, String name) {
+        Axiom axiom = wmm.getConstraints().stream()
+                .filter(c -> c instanceof Axiom)
+                .map(c -> (Axiom)c)
+                .filter(c -> name.equals(c.getName()))
+                .findFirst().orElseThrow();
+        wmm.removeConstraint(axiom);
+        return axiom;
     }
 
     private Map<String, MutableEventGraph> extractRelationsData(
@@ -208,7 +221,7 @@ scopes-mp-acq-acq-b
         Files.write(Path.of(filePath), sb.toString().getBytes());
     }
 
-    private VerificationTask mkTask(String programPath, String modelPath, Property property, String type) throws Exception {
+    private VerificationTask mkTask(String programPath, Wmm mcm, Property property) throws Exception {
         VerificationTask.VerificationTaskBuilder builder = VerificationTask.builder()
                 .withConfig(Configuration.builder()
                         .setOption(ENABLE_EXTENDED_RELATION_ANALYSIS, "false")
@@ -218,7 +231,6 @@ scopes-mp-acq-acq-b
                 .withBound(1)
                 .withTarget(Arch.VULKAN);
         Program program = new ProgramParser().parse(new File(programPath));
-        Wmm mcm = new ParserCat(libs.get(type)).parse(new File(modelPath));
         return builder.build(program, mcm, EnumSet.of(property));
     }
 }
