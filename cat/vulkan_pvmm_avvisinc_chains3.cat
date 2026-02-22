@@ -70,14 +70,14 @@ let inscope = (DV * DV) |
 let mutordatom = (loc & vloc & inscope & (ATOM * ATOM)) \ id
 let asmo = co & mutordatom
 
-let avvisSem = (SC0123 * AVDEVICE) | (VISDEVICE * SC0123) |
-               (SC0 * (SEMSC0 & SEMAV)) | (SC1 * (SEMSC1 & SEMAV)) | (SC2 * (SEMSC2 & SEMAV)) | (SC3 * (SEMSC3 & SEMAV)) |
-               ((SEMSC0 & SEMVIS) * SC0) | ((SEMSC1 & SEMVIS) * SC1) | ((SEMSC2 & SEMVIS) * SC2) | ((SEMSC3 & SEMVIS) * SC3)
-let avvisSet = [AV | VIS]; (vloc & loc)
-let avvisinc = avvisSem | avvisSet | avvisSet^-1
+let sc2sem = (SC0 * SEMSC0) | (SC1 * SEMSC1) | (SC2 * SEMSC2) | (SC3 * SEMSC3)
+let sem2sc = (SEMSC0 * SC0) | (SEMSC1 * SC1) | (SEMSC2 * SC2) | (SEMSC3 * SC3)
+let avvisinc = (W * AVDEVICE) | (VISDEVICE * R) |
+               ((W * SEMAV) & sc2sem) | ((SEMVIS * R) & sem2sc) |
+               (vloc & loc & ((W * AV) | (VIS * R)))
 
-let posctosem = ((SC0 * SEMSC0) | (SC1 * SEMSC1) | (SC2 * SEMSC2) | (SC3 * SEMSC3)) & po
-let posemtosc = ((SEMSC0 * SC0) | (SEMSC1 * SC1) | (SEMSC2 * SC2) | (SEMSC3 * SC3)) & po
+let posctosem = po & sc2sem
+let posemtosc = po & sem2sc
 
 let imm(r) = r \ (r; r+)
 let rs = [REL & ATOM]; (imm(asmo); [RMW])*

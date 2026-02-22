@@ -1,4 +1,4 @@
-test,vulkan_pvmm,vulkan_pvmm_avvisinc,vulkan_pvmm_semsc,vulkan_pvmm_semsc_nonpriv,vulkan_pvmm_chains1,vulkan_pvmm_chains2,vulkan_pvmm_chains3,vulkan_pvmm_locord_wrong_1,vulkan_pvmm_locord_wrong_2,vulkan_pvmm_locord,vulkan_pvmm_semsc_nonpriv_locord,vulkan_pvmm_semsc_nonpriv_locord_fence
+test,vulkan_pvmm,vulkan_pvmm_avvisinc,vulkan_pvmm_avvisinc_semsc,vulkan_pvmm_avvisinc_semsc_nonpriv,vulkan_pvmm_avvisinc_chains1,vulkan_pvmm_avvisinc_chains2,vulkan_pvmm_avvisinc_chains3,vulkan_pvmm_avvisinc_locord_wrong_1,vulkan_pvmm_avvisinc_locord_wrong_2,vulkan_pvmm_avvisinc_locord,vulkan_pvmm_avvisinc_semsc_nonpriv_locord,vulkan_pvmm_avvisinc_semsc_nonpriv_locord_fence
 ,,,,,,,,,,,,
 2-f-graph-avvis-chains-semav,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 2-f-graph-avvis-chains-semvis,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
