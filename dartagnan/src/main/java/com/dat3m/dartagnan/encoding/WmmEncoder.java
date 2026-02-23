@@ -22,7 +22,6 @@ import com.dat3m.dartagnan.wmm.utils.Flag;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import com.dat3m.dartagnan.wmm.utils.graph.mutable.MapEventGraph;
 import com.dat3m.dartagnan.wmm.utils.graph.mutable.MutableEventGraph;
-
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
@@ -629,6 +628,44 @@ public class WmmEncoder implements Encoder {
                         : utils.exactlyOneSequence(rfChoices, "rf_E" + r.getGlobalId());
                 enc.add(bmgr.implication(context.execution(r), rfExistenceConstraint));
             }
+
+            // TODO: THIS IS UNOPTIMIZED TEST CODE!
+            // Local consistency:
+            final var mayIn = ra.getKnowledge(rf).getMaySet().getInMap();
+            for (Load r : program.getThreadEvents(Load.class)) {
+                final BooleanFormula uninit = getUninitReadVar(r);
+
+                List<Store> localStores = mayIn.get(r).stream()
+                        .filter(e -> e instanceof Store && e.getLocalId() < r.getLocalId()
+                                && e.getThread() == r.getThread())
+                        .map(e -> (Store) e)
+                        .sorted(Comparator.comparingInt(Event::getGlobalId))
+                        .collect(Collectors.toList());
+
+                mayIn.get(r).stream()
+                        .filter(e -> e instanceof Init)
+                        .map(e -> (Store) e)
+                        .forEach(e -> localStores.add(0, e));
+
+                for (int i = 0; i < localStores.size(); i++) {
+                    Store w1 = localStores.get(i);
+                    // No uninit read if previous same-address store exists
+                    enc.add(bmgr.implication(
+                            bmgr.and(context.execution(w1), context.sameAddress(w1, r)),
+                            bmgr.not(uninit)
+                    ));
+
+                    // No reads from the past
+                    for (int j = i + 1; j < localStores.size(); j++) {
+                        Store w2 = localStores.get(j);
+                        enc.add(bmgr.implication(
+                                bmgr.and(context.execution(w1, w2), context.sameAddress(w1, w2)),
+                                bmgr.not(edge.encode(w1, r))
+                        ));
+                    }
+                }
+            }
+
             return null;
         }
 
