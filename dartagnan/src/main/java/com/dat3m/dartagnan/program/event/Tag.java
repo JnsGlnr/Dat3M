@@ -131,7 +131,7 @@ public final class Tag {
 
         public static final String DEFAULT_MO           = MO_SC;
 
-        public static final String NORETURN             = "Noreturn";
+        public static final String NORETURN             = "NORETURN";
 
         public static String loadMO(String mo) {
             return switch (mo) {
