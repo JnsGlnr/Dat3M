@@ -1,7 +1,9 @@
 test,vulkan_pvmm,vulkan_pvmm_avvisinc,vulkan_pvmm_avvisinc_semsc,vulkan_pvmm_avvisinc_semsc_nonpriv,vulkan_pvmm_avvisinc_semsc_nonpriv_fence,vulkan_pvmm_avvisinc_chains1,vulkan_pvmm_avvisinc_chains2,vulkan_pvmm_avvisinc_chains3,vulkan_pvmm_avvisinc_locord_wrong_1,vulkan_pvmm_avvisinc_locord_wrong_2,vulkan_pvmm_avvisinc_locord,vulkan_pvmm_avvisinc_semsc_nonpriv_locord,vulkan_pvmm_avvisinc_semsc_nonpriv_locord_fence
 ,,,,,,,,,,,,,
-2-f-graph-avvis-chains-semav,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
-2-f-graph-avvis-chains-semvis,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+2-f-graph-avvis-chains-semav-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+2-f-graph-avvis-chains-semav-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+2-f-graph-avvis-chains-semvis-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+2-f-graph-avvis-chains-semvis-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,,,,,,,
 3-f-graph-problem-chains-avvis-5-th-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 3-f-graph-problem-chains-avvis-5-th-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS,PASS,PASS,PASS,PASS
