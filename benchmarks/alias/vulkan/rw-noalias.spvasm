@@ -1,0 +1,61 @@
+; spirv-as rw-noalias.spvasm -o rw-noalias.spv
+; spirv-val --target-env vulkan1.3 rw-noalias.spv
+
+; SPIR-V
+; Version: 1.6
+; Generator: Google spiregg; 0
+; Bound: 28
+; Schema: 0
+               OpCapability Shader
+               OpCapability VulkanMemoryModel
+               OpCapability VulkanMemoryModelDeviceScope
+               OpMemoryModel Logical Vulkan
+               OpEntryPoint GLCompute %main "main" %gl_GlobalInvocationID %ptrA %ptrB %output
+               OpExecutionMode %main LocalSize 256 1 1
+               OpSource HLSL 600
+               OpName %type_RWStructuredBuffer_int "type.RWStructuredBuffer.int"
+               OpName %ptrA "ptrA"
+               OpName %ptrB "ptrB"
+               OpName %output "output"
+               OpName %main "main"
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpDecorate %ptrA DescriptorSet 0
+               OpDecorate %ptrA Binding 0
+               OpDecorate %ptrB DescriptorSet 0
+               OpDecorate %ptrB Binding 1
+               OpDecorate %output DescriptorSet 0
+               OpDecorate %output Binding 2
+               OpDecorate %_runtimearr_int ArrayStride 4
+               OpMemberDecorate %type_RWStructuredBuffer_int 0 Offset 0
+               OpDecorate %type_RWStructuredBuffer_int Block
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+       %uint = OpTypeInt 32 0
+%_runtimearr_int = OpTypeRuntimeArray %int
+%type_RWStructuredBuffer_int = OpTypeStruct %_runtimearr_int
+%_ptr_StorageBuffer_type_RWStructuredBuffer_int = OpTypePointer StorageBuffer %type_RWStructuredBuffer_int
+     %v3uint = OpTypeVector %uint 3
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+       %void = OpTypeVoid
+         %15 = OpTypeFunction %void
+%_ptr_StorageBuffer_int = OpTypePointer StorageBuffer %int
+       %ptrA = OpVariable %_ptr_StorageBuffer_type_RWStructuredBuffer_int StorageBuffer
+       %ptrB = OpVariable %_ptr_StorageBuffer_type_RWStructuredBuffer_int StorageBuffer
+     %output = OpVariable %_ptr_StorageBuffer_type_RWStructuredBuffer_int StorageBuffer
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+       %main = OpFunction %void None %15
+         %17 = OpLabel
+         %18 = OpLoad %v3uint %gl_GlobalInvocationID
+         %19 = OpCompositeExtract %uint %18 0
+         %20 = OpAccessChain %_ptr_StorageBuffer_int %ptrA %int_0 %19
+         %21 = OpLoad %int %20 Aligned|NonPrivatePointer 4
+         %22 = OpBitcast %int %19
+         %23 = OpAccessChain %_ptr_StorageBuffer_int %ptrB %int_0 %19
+               OpStore %23 %22 Aligned|NonPrivatePointer 4
+         %24 = OpBitcast %uint %21
+         %25 = OpIAdd %uint %19 %24
+         %26 = OpBitcast %int %25
+         %27 = OpAccessChain %_ptr_StorageBuffer_int %output %int_0 %19
+               OpStore %27 %26
+               OpReturn
+               OpFunctionEnd
