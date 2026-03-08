@@ -25,7 +25,6 @@ import com.dat3m.dartagnan.program.memory.Memory;
 import com.dat3m.dartagnan.program.memory.MemoryObject;
 import com.dat3m.dartagnan.program.misc.NonDetValue;
 import com.dat3m.dartagnan.verification.Context;
-
 import com.google.common.base.Preconditions;
 import com.google.common.base.Verify;
 import com.google.common.collect.ImmutableList;
@@ -37,7 +36,6 @@ import org.sosy_lab.common.configuration.Option;
 import org.sosy_lab.common.configuration.Options;
 import org.sosy_lab.java_smt.api.*;
 import org.sosy_lab.java_smt.api.NumeralFormula.IntegerFormula;
-
 
 import java.math.BigInteger;
 import java.util.*;
@@ -532,7 +530,41 @@ public class ProgramEncoder {
                 }
             }
         }
+
+        enc.addAll(computeRegReaderEqualities());
+
         return bmgr.and(enc);
+    }
+
+    // TODO: This is a trivial implementation to find some equalities
+    //  We can probably do better than this
+    private List<BooleanFormula> computeRegReaderEqualities() {
+        final ExpressionEncoder exprEnc = context.getExpressionEncoder();
+
+        final Map<Register, RegReader> lastReaders = new HashMap<>();
+        final List<BooleanFormula> equalities = new ArrayList<>();
+        for (Thread thread : context.getTask().getProgram().getThreads()) {
+            for (Event e : thread.getEvents()) {
+                if (e instanceof RegReader reader) {
+                    for (Register.Read read : reader.getRegisterReads()) {
+                        final Register reg = read.register();
+                        final RegReader lastReader = lastReaders.get(reg);
+
+                        if (lastReader != null && exec.isImplied(reader, lastReader)) {
+                            equalities.add(exprEnc.equalAt(reg, e, reg, lastReader));
+                        } else {
+                            lastReaders.put(reg, reader);
+                        }
+                    }
+                }
+
+                if (e instanceof RegWriter writer) {
+                    lastReaders.remove(writer.getResultRegister());
+                }
+            }
+        }
+
+        return equalities;
     }
 
     public BooleanFormula encodeFilter() {
