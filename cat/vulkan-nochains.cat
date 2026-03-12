@@ -94,7 +94,7 @@ let hb = (po |
 let E = (M | F | CBAR | AVDEVICE | VISDEVICE) \ IW
 let chains = [E]
 
-let avvisSem = (M * AVDEVICE) | (VISDEVICE * M) | (sc2sem; [SEMAV]) | ([SEMVIS]; sem2sc)
+let avvisSem = (sc2sem; [SEMAV]) | ([SEMVIS]; sem2sc)
 let avvisSet = [AV | VIS]; (vloc & loc)
 let avvisinc = avvisSem | avvisSet | avvisSet^-1
 
@@ -118,19 +118,21 @@ let visqf = [VISQF]; (chains & (((hb & swg & avvisinc) ; viswg)?; ((hb & ssg & a
 let visdv = [VISDV]; (chains & (((hb & sqf & avvisinc) ; visqf)?; ((hb & swg & avvisinc); viswg)?; ((hb & ssg & avvisinc); vissg)?))
 
 // location order, relates memory accesses to the same location
-let flocord(TAG, ord, av, scope, vis) =
-    [W & TAG]; (ord & avvisinc); av; (hb & scope); ([W & TAG] | (vis; (ord & avvisinc); [R & TAG]))
+let flocord(av, scope, vis) =
+    ([W & NONPRIV]; (po? & avvisinc); av; (hb & scope); [W & NONPRIV]) |
+    ([W & NONPRIV]; (po? & avvisinc); av; (hb & scope); vis; (po? & avvisinc); [R & NONPRIV])
 
 let locord = loc & (
     ([R]; ssw+; [R | W]) |
+    ([W]; hb; [AVDEVICE]; hb; [W]) |
+    ([W]; hb; [AVDEVICE]; hb; [VISDEVICE]; hb; [R]) |
     ([R & NONPRIV]; hb; [(R | W) & NONPRIV]) |
-    flocord(M, hb, [AVDEVICE], hb, [VISDEVICE]) |
     vloc & (
         (hb & int) |
-        flocord(NONPRIV, po?, avsg, ssg, vissg) |
-        flocord(NONPRIV, po?, avwg, swg, viswg) |
-        flocord(NONPRIV, po?, avqf, sqf, visqf) |
-        flocord(NONPRIV, po?, avdv, hb, visdv)
+        flocord(avsg, ssg, vissg) |
+        flocord(avwg, swg, viswg) |
+        flocord(avqf, sqf, visqf) |
+        flocord(avdv, hb, visdv)
     )
 )
 
