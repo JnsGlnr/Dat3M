@@ -187,24 +187,25 @@ let locordrr = (avsg0; (ithb0 & ssg); vissg0) | (avwg0; (ithb0 & swg); viswg0) |
                (avsg2; (ithb2 & ssg); vissg2) | (avwg2; (ithb2 & swg); viswg2) | (avqf2; (ithb2 & sqf); visqf2) | (avdv2; ithb2; visdv2) |
                (avsg3; (ithb3 & ssg); vissg3) | (avwg3; (ithb3 & swg); viswg3) | (avqf3; (ithb3 & sqf); visqf3) | (avdv3; ithb3; visdv3)
 
-let shb = ((SC0 * SC0) & ithb0) | ((SC1 * SC1) & ithb1) |
-          ((SC2 * SC2) & ithb2) | ((SC3 * SC3) & ithb3) |
-          (((SC0 * SC1) | (SC1 * SC0)) & ithb01) |
-          (((SC0 * SC2) | (SC2 * SC0)) & ithb02) |
-          (((SC0 * SC3) | (SC3 * SC0)) & ithb03) |
-          (((SC1 * SC2) | (SC2 * SC1)) & ithb12) |
-          (((SC1 * SC3) | (SC3 * SC1)) & ithb13) |
-          (((SC2 * SC3) | (SC3 * SC2)) & ithb23)
+let schb = ([SC0]; ithb0) | ([SC1]; ithb1) | ([SC2]; ithb2) | ([SC3]; ithb3)
+let hbsc = (ithb0; [SC0]) | (ithb1; [SC1]) | (ithb2; [SC2]) | (ithb3; [SC3])
+let schbsc = (ithb0 & (SC0 * SC0)) | (ithb1 & (SC1 * SC1)) | (ithb2 & (SC2 * SC2)) | (ithb3 & (SC3 * SC3))
+let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
+              (ithb02 & ((SC0 * SC1) | (SC1 * SC0))) |
+              (ithb03 & ((SC0 * SC1) | (SC1 * SC0))) |
+              (ithb12 & ((SC0 * SC1) | (SC1 * SC0))) |
+              (ithb13 & ((SC0 * SC1) | (SC1 * SC0))) |
+              (ithb23 & ((SC0 * SC1) | (SC1 * SC0)))
 
+// TODO: IW * ...
 let locord = loc & (
     (IW * (W \ IW)) |
     ([R]; ssw+; [R | W]) |
-    // TODO: Should also be matching hb
-    ([W]; hb; [AVDEVICE]; hb; [W]) |
-    ([W]; hb; [AVDEVICE]; hb; [VISDEVICE]; hb; [R]) |
-    ([R & NONPRIV]; (po | shb); [(R | W) & NONPRIV]) |
+    ([W]; schb; [AVDEVICE]; hbsc; [W]) |
+    ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]) |
+    ([R & NONPRIV]; (po | schbsc | schbsca); [(R | W) & NONPRIV]) |
     vloc & (
-        ((po | shb) & int) |
+        ((po | schbsc) & int) |
         ([W & NONPRIV]; locordww; [W & NONPRIV]) |
         ([W & NONPRIV]; locordrr; [R & NONPRIV])
     )
