@@ -1466,7 +1466,16 @@ public class Intrinsics {
         if (!(moCode instanceof IntLiteral literal)) {
             throw new UnsupportedOperationException("Variable memory order \"" + moCode + "\"");
         }
-        return Tag.C11.intToMo(literal.getValueAsInt());
+
+        return switch (literal.getValueAsInt()) {
+            case 0 -> Tag.C11.MO_RELAXED;
+            case 1 -> Tag.C11.MO_CONSUME;
+            case 2 -> Tag.C11.MO_ACQUIRE;
+            case 3 -> Tag.C11.MO_RELEASE;
+            case 4 -> Tag.C11.MO_ACQUIRE_RELEASE;
+            case 5 -> Tag.C11.MO_SC;
+            default -> throw new IllegalArgumentException("Invalid memory order value " + literal.getValueAsInt());
+        };
     }
 
     private List<Event> handleC26AtomicOP(FunctionCall call) {

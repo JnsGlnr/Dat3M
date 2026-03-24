@@ -1,3 +1,7 @@
+// TODO: This is a temporarily solution until LLVM supports atomic reductions natively
+
+// TODO: We might want to add more variants for atomic reductions, e.g., signed/unsigned variants
+//   and float support.
 
 typedef enum {
   __C26_op_add,

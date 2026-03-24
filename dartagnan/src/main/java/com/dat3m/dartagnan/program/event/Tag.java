@@ -151,17 +151,6 @@ public final class Tag {
             };
         }
 
-        public static String intToMo(int i) {
-            return switch (i) {
-                case 0 -> MO_RELAXED;
-                case 1 -> MO_CONSUME;
-                case 2 -> MO_ACQUIRE;
-                case 3 -> MO_RELEASE;
-                case 4 -> MO_ACQUIRE_RELEASE;
-                case 5 -> MO_SC;
-                default -> throw new IllegalArgumentException("Invalid memory order value " + i);
-            };
-        }
     }
 
     // =============================================================================================
