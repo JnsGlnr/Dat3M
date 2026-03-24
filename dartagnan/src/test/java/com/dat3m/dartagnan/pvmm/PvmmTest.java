@@ -37,6 +37,7 @@ import static com.dat3m.dartagnan.configuration.Property.CAT_SPEC;
 import static com.dat3m.dartagnan.configuration.Property.PROGRAM_SPEC;
 import static com.dat3m.dartagnan.utils.ResourceHelper.getRootPath;
 import static com.dat3m.dartagnan.utils.Result.FAIL;
+import static com.dat3m.dartagnan.utils.Result.PASS;
 import static com.dat3m.dartagnan.wmm.RelationNameRepository.ID;
 import static java.util.stream.Collectors.toMap;
 import static org.junit.Assert.*;
@@ -56,6 +57,19 @@ public class PvmmTest {
             Map<String, Map<String, Result>> all = readFile("expected-all");
             expected.get("chains").putAll(all);
             expected.get("nochains").putAll(all);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static final Map<String, Map<String, Map<String, Result>>> expectedRaces = new HashMap<>();
+    static {
+        try {
+            expectedRaces.put("chains", readFile("expected-races-chains"));
+            expectedRaces.put("nochains", readFile("expected-races-nochains"));
+            Map<String, Map<String, Result>> all = readFile("expected-races-all");
+            expectedRaces.get("chains").putAll(all);
+            expectedRaces.get("nochains").putAll(all);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -87,22 +101,55 @@ public class PvmmTest {
     private final Printer printer = Printer.newInstance();
 
     @Test
+    public void checkRace() throws Exception {
+        for (Map.Entry<String, Map<String, Map<String, Result>>> typeEntry : expectedRaces.entrySet()) {
+            System.out.println(typeEntry.getKey());
+            for (Map.Entry<String, Map<String, Result>> programEntry : typeEntry.getValue().entrySet()) {
+                String programPath = getRootPath("litmus/VULKAN/pvmm/" + programEntry.getKey() + ".litmus");
+                System.out.println(programPath);
+                for (Map.Entry<String, Result> resultEntry : programEntry.getValue().entrySet()) {
+                    Result result = resultEntry.getValue() == PASS ? FAIL : PASS;
+                    String model = getRootPath("cat/" + resultEntry.getKey() + ".cat");
+                    System.out.println("    " + resultEntry.getKey());
+                    Program program = new ProgramParser().parse(new File(programPath));
+                    Wmm mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(model));
+                    VerificationTask taskEager = mkTask(program, mcm, CAT_SPEC);
+                    try (ModelChecker mc = ModelChecker.create(taskEager, Method.EAGER)) {
+                        mc.run();
+                        assertEquals(result, mc.getResult());
+                    }
+                    program = new ProgramParser().parse(new File(programPath));
+                    mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(model));
+                    VerificationTask taskLazy = mkTask(program, mcm, CAT_SPEC);
+                    try (ModelChecker mc = ModelChecker.create(taskLazy, Method.LAZY)) {
+                        mc.run();
+                        assertEquals(result, mc.getResult());
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     public void checkResult() throws Exception {
         for (Map.Entry<String, Map<String, Map<String, Result>>> typeEntry : expected.entrySet()) {
             System.out.println(typeEntry.getKey());
             for (Map.Entry<String, Map<String, Result>> programEntry : typeEntry.getValue().entrySet()) {
-                String program = getRootPath("litmus/VULKAN/pvmm/" + programEntry.getKey() + ".litmus");
-                System.out.println(program);
+                String programPath = getRootPath("litmus/VULKAN/pvmm/" + programEntry.getKey() + ".litmus");
+                System.out.println(programPath);
                 for (Map.Entry<String, Result> resultEntry : programEntry.getValue().entrySet()) {
                     Result result = resultEntry.getValue();
                     String model = getRootPath("cat/" + resultEntry.getKey() + ".cat");
                     System.out.println("    " + resultEntry.getKey());
+                    Program program = new ProgramParser().parse(new File(programPath));
                     Wmm mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(model));
                     VerificationTask taskEager = mkTask(program, mcm, PROGRAM_SPEC);
                     try (ModelChecker mc = ModelChecker.create(taskEager, Method.EAGER)) {
                         mc.run();
                         assertEquals(result, mc.getResult());
                     }
+                    program = new ProgramParser().parse(new File(programPath));
+                    mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(model));
                     VerificationTask taskLazy = mkTask(program, mcm, PROGRAM_SPEC);
                     try (ModelChecker mc = ModelChecker.create(taskLazy, Method.LAZY)) {
                         mc.run();
@@ -117,11 +164,12 @@ public class PvmmTest {
     public void logRelations() throws Exception {
         for (Map.Entry<String, Map<String, Map<String, Result>>> typeEntry : expected.entrySet()) {
             for (Map.Entry<String, Map<String, Result>> programEntry : typeEntry.getValue().entrySet()) {
-                String program = getRootPath("litmus/VULKAN/pvmm/" + programEntry.getKey() + ".litmus");
-                System.out.println(program);
+                String programPath = getRootPath("litmus/VULKAN/pvmm/" + programEntry.getKey() + ".litmus");
+                System.out.println(programPath);
                 for (Map.Entry<String, Result> resultEntry : programEntry.getValue().entrySet()) {
                     Result result = resultEntry.getValue();
                     String modelPath = getRootPath("cat/" + resultEntry.getKey() + ".cat");
+                    Program program = new ProgramParser().parse(new File(programPath));
                     Wmm mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(modelPath));
                     Property property = PROGRAM_SPEC;
                     if (result == FAIL) {
@@ -132,6 +180,7 @@ public class PvmmTest {
                         mcm.addConstraint(new Emptiness(cycle, true, true));
                         Axiom axiomRf = removeAxiom(mcm, "consistency-rf");
                         mcm.addConstraint(new Emptiness(axiomRf.getRelation(), true, true));
+                        program.setFilterSpecification(program.getSpecification());
                         property = CAT_SPEC;
                     }
                     VerificationTask task = mkTask(program, mcm, property);
@@ -142,7 +191,38 @@ public class PvmmTest {
                         Set<Relation> relations = task.getMemoryModel().getRelations();
                         Map<String, MutableEventGraph> data = extractRelationsData(task.getProgram(), relations, ra, mc.getProver().getModel());
                         data = translateEventIds(task.getProgram(), data);
-                        log(resultEntry.getKey(), task.getProgram(), typeEntry.getKey(), data);
+                        log("data", resultEntry.getKey(), task.getProgram(), typeEntry.getKey(), data);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void logRaces() throws Exception {
+        for (Map.Entry<String, Map<String, Map<String, Result>>> typeEntry : expectedRaces.entrySet()) {
+            for (Map.Entry<String, Map<String, Result>> programEntry : typeEntry.getValue().entrySet()) {
+                String programPath = getRootPath("litmus/VULKAN/pvmm/" + programEntry.getKey() + ".litmus");
+                System.out.println(programPath);
+                for (Map.Entry<String, Result> resultEntry : programEntry.getValue().entrySet()) {
+                    Result result = resultEntry.getValue() == PASS ? FAIL : PASS;
+                    String modelPath = getRootPath("cat/" + resultEntry.getKey() + ".cat");
+                    Program program = new ProgramParser().parse(new File(programPath));
+                    Wmm mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(modelPath));
+                    Property property = CAT_SPEC;
+                    if (result == PASS) {
+                        property = PROGRAM_SPEC;
+                        program.setSpecification(Program.SpecificationType.EXISTS, program.getFilterSpecification());
+                    }
+                    VerificationTask task = mkTask(program, mcm, property);
+                    try (ModelChecker mc = ModelChecker.create(task, Method.EAGER)) {
+                        mc.run();
+                        assertTrue(mc.hasModel());
+                        RelationAnalysis ra = mc.getEncodingContext().getAnalysisContext().get(RelationAnalysis.class);
+                        Set<Relation> relations = task.getMemoryModel().getRelations();
+                        Map<String, MutableEventGraph> data = extractRelationsData(task.getProgram(), relations, ra, mc.getProver().getModel());
+                        data = translateEventIds(task.getProgram(), data);
+                        log("races", resultEntry.getKey(), task.getProgram(), typeEntry.getKey(), data);
                     }
                 }
             }
@@ -207,7 +287,7 @@ public class PvmmTest {
                         entry -> entry.getValue().filter((e1, e2) -> filter.contains(e1) && filter.contains(e2))));
     }
 
-    private void log(String model, Program program, String type, Map<String, MutableEventGraph> data) throws IOException {
+    private void log(String dir, String model, Program program, String type, Map<String, MutableEventGraph> data) throws IOException {
         List<String> relations = data.keySet().stream().sorted().toList();
         StringBuilder sb = new StringBuilder();
         sb.append(printer.print(program));
@@ -216,12 +296,12 @@ public class PvmmTest {
                 sb.append(relation).append(": ").append(data.get(relation)).append("\n");
             }
         }
-        Files.createDirectories(Path.of(getRootPath("output/data/" + type + "/" + model)));
-        String filePath = getRootPath("output/data/" + type + "/" + model + "/" + program.getName() + ".log");
+        Files.createDirectories(Path.of(getRootPath("output/" + dir + "/" + type + "/" + model)));
+        String filePath = getRootPath("output/" + dir + "/" + type + "/" + model + "/" + program.getName() + ".log");
         Files.write(Path.of(filePath), sb.toString().getBytes());
     }
 
-    private VerificationTask mkTask(String programPath, Wmm mcm, Property property) throws Exception {
+    private VerificationTask mkTask(Program program, Wmm mcm, Property property) throws Exception {
         VerificationTask.VerificationTaskBuilder builder = VerificationTask.builder()
                 .withConfig(Configuration.builder()
                         .setOption(ENABLE_EXTENDED_RELATION_ANALYSIS, "false")
@@ -230,7 +310,6 @@ public class PvmmTest {
                 )
                 .withBound(1)
                 .withTarget(Arch.VULKAN);
-        Program program = new ProgramParser().parse(new File(programPath));
         return builder.build(program, mcm, EnumSet.of(property));
     }
 }

@@ -4,6 +4,6 @@ Vulkan
  ld.atom.acq.dv.sc1.semsc1 r0, x        | ld.atom.acq.dv.sc2.semsc0.semsc2 r1, y ;
  st.atom.rel.dv.sc2.semsc0.semsc2 y, 1  | st.atom.rel.dv.sc1.semsc1 x, 1         ;
 filter
-(P0:r0 == 1 /\ P1:r1 == 1)
+(P0:r0 == 1)
 exists
 (P0:r0 == 1 /\ P1:r1 == 1)

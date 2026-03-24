@@ -5,6 +5,6 @@ Vulkan
  st.atom.rel.dv.sc2.semsc0.semsc2 f, 1 | st.atom.rel.qf.sc1.semsc1 c, 1                | st.atom.rel.wg.sc1.semsc1 d, 1                | st.atom.rel.sg.sc0.semsc0 e, 1                | ld.atom.acq.dv.sc2.semsc0.semsc2 r2, f ;
  st.atom.rel.dv.sc0.semsc0 b, 1        |                                               |                                               |                                               | ld.nonpriv.sc0 r1, a                   ;
 filter
-(P1:r0 == 1 /\ P2:r0 == 1 /\ P3:r0 == 1 /\ P4:r0 == 1 /\ P4:r1 == 0 /\ P4:r2 == 1)
+(P1:r0 == 1 /\ P2:r0 == 1 /\ P3:r0 == 1 /\ P4:r0 == 1 /\ P4:r2 == 1)
 exists
 (P1:r0 == 1 /\ P2:r0 == 1 /\ P3:r0 == 1 /\ P4:r0 == 1 /\ P4:r1 == 0 /\ P4:r2 == 1)

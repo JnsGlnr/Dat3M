@@ -6,6 +6,6 @@ Vulkan
  membar.rel.dv.semsc0.semsc2 | membar.rel.dv.semsc0.semsc1 ;
  st.atom.dv.sc2 y, 1         | st.atom.dv.sc1 x, 1         ;
 filter
-(P0:r0 == 1 /\ P1:r1 == 1)
+(P0:r0 == 1)
 exists
 (P0:r0 == 1 /\ P1:r1 == 1)
