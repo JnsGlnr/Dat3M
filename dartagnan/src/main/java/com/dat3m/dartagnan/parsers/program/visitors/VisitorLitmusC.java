@@ -541,7 +541,7 @@ public class VisitorLitmusC extends LitmusCBaseVisitor<Object> {
     public Object visitNreC11AtomicOp(LitmusCParser.NreC11AtomicOpContext ctx){
         Expression value = returnExpressionOrOne(ctx.value);
         Event event = EventFactory.Atomic.newRMWOp(getAddress(ctx.address), value, ctx.op, ctx.c11Mo().mo);
-        return programBuilder.addChild(currentThread, event);
+        return programBuilder.addChild(currentThread, event, ctx.getStart().getLine());
     }
 
     @Override
