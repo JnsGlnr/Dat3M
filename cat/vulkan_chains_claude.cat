@@ -109,17 +109,17 @@ let hb = (po |
 )
 
 let avvisSem = (M * AVDEVICE) | (VISDEVICE * M) | (sc2sem; [SEMAV]) | ([SEMVIS]; sem2sc)
-let avvisSet = [AV | VIS]; (vloc & loc)
+let avvisSet = [SG]; (vloc & loc)
 let avvisinc = avvisSem | avvisSet | avvisSet^-1
 
-let AVDV = (AV | SEMAV) & DV
-let VISDV = (VIS | SEMVIS) & DV
-let AVQF = (AV | SEMAV) & QF
-let VISQF = (VIS | SEMVIS) & QF
-let AVWG = (AV | SEMAV) & WG
-let VISWG = (VIS | SEMVIS) & WG
-let AVSG = (AV | SEMAV) & SG
-let VISSG = (VIS | SEMVIS) & SG
+let AVDV = (W | SEMAV) & DV
+let VISDV = (R | SEMVIS) & DV
+let AVQF = (W | SEMAV) & QF
+let VISQF = (R | SEMVIS) & QF
+let AVWG = (W | SEMAV) & WG
+let VISWG = (R | SEMVIS) & WG
+let AVSG = (W | SEMAV) & SG
+let VISSG = (R | SEMVIS) & SG
 
 let avsg = [AVSG]
 let avwg = (chains & ((avsg; (hb & ssg & avvisinc)) | ([AVWG]; (hb & swg & avvisinc)))*); [AVWG]

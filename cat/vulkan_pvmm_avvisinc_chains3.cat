@@ -110,16 +110,16 @@ let hb = (po |
 
 let avvisinc = (W * AVDEVICE) | (VISDEVICE * R) |
                ((W * SEMAV) & sc2sem) | ((SEMVIS * R) & sem2sc) |
-               (vloc & loc & ((W * AV) | (VIS * R)))
+               (vloc & loc & ((W * SG) | (SG * R)))
 
-let AVDV = (AV | SEMAV) & DV
-let VISDV = (VIS | SEMVIS) & DV
-let AVQF = (AV | SEMAV) & QF
-let VISQF = (VIS | SEMVIS) & QF
-let AVWG = (AV | SEMAV) & WG
-let VISWG = (VIS | SEMVIS) & WG
-let AVSG = (AV | SEMAV) & SG
-let VISSG = (VIS | SEMVIS) & SG
+let AVDV = (W | SEMAV) & DV
+let VISDV = (R | SEMVIS) & DV
+let AVQF = (W | SEMAV) & QF
+let VISQF = (R | SEMVIS) & QF
+let AVWG = (W | SEMAV) & WG
+let VISWG = (R | SEMVIS) & WG
+let AVSG = (W | SEMAV) & SG
+let VISSG = (R | SEMVIS) & SG
 
 let hbchains = chains & (hb | id)
 
