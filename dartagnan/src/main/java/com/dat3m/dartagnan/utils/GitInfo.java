@@ -15,15 +15,15 @@ public class GitInfo {
 
     static Properties properties = new Properties();
 
-    public static void initGitInfo() throws IOException {
+    public static void initGitInfo() {
         try (InputStream is = Dartagnan.class.getClassLoader()
                 .getResourceAsStream("git.properties")) {
-            if (is == null) {
-                logger.warn("Failed to load git.properties");
+            if (is != null) {
+                properties.load(is);
                 return;
             }
-            properties.load(is);
-        }
+        } catch (IOException e) {}
+        logger.warn("Failed to load git.properties");
     }
 
     public static void logGitInfo() {

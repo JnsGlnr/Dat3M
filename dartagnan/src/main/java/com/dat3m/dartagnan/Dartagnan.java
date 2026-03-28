@@ -98,7 +98,7 @@ public class Dartagnan extends BaseOptions {
     }
 
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
 
         initGitInfo();
 
@@ -109,17 +109,30 @@ public class Dartagnan extends BaseOptions {
 
         if (Arrays.asList(args).contains("--version")) {
             final MavenXpp3Reader mvnReader = new MavenXpp3Reader();
-            final FileReader fileReader = new FileReader(System.getenv("DAT3M_HOME") + "/pom.xml");
-            final String base = mvnReader.read(fileReader).getVersion();
-            final String version = base.equals(getGitTags()) ? base : String.format("%s (commit %s)", base, getGitId());
-            System.out.println(version);
+            final String pomPath = System.getenv("DAT3M_HOME") + "/pom.xml";
+            try (FileReader fileReader = new FileReader(pomPath)) {
+                final String base = mvnReader.read(fileReader).getVersion();
+                final String version = base.equals(getGitTags()) ? base : String.format("%s (commit %s)", base, getGitId());
+                System.out.println(version);
+            } catch (Exception e) {
+                logger.warn("Failed to read version from {}", pomPath, e);
+                System.exit(UNKNOWN_ERROR.asInt());
+            }
             return;
         }
 
         logGitInfo();
 
-        final Configuration config = loadConfiguration(args);
-        final Dartagnan o = new Dartagnan(config);
+        final Configuration config;
+        final Dartagnan o;
+        try {
+            config = loadConfiguration(args);
+            o = new Dartagnan(config);
+        } catch (IOException | InvalidConfigurationException e) {
+            logger.error(e.getMessage());
+            System.exit(UNKNOWN_ERROR.asInt());
+            return;
+        }
 
         final File fileModel = new File(Arrays.stream(args).filter(a -> a.endsWith(".cat")).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("CAT model not given or format not recognized")));
@@ -129,7 +142,13 @@ public class Dartagnan extends BaseOptions {
         final WitnessGraph witness;
         if (o.runValidator()) {
             logger.info("Witness path: {}", o.getWitnessPath());
-            witness = new ParserWitness().parse(new File(o.getWitnessPath()));
+            try {
+                witness = new ParserWitness().parse(new File(o.getWitnessPath()));
+            } catch (IOException e) {
+                logger.error("Failed to read witness file {}", o.getWitnessPath());
+                System.exit(WRONG_WITNESS_FILE.asInt());
+                return;
+            }
         } else {
             witness = new WitnessGraph();
         }
@@ -220,7 +239,9 @@ public class Dartagnan extends BaseOptions {
                 }
             });
         if (files.isEmpty()) {
-            throw new IllegalArgumentException("Path to input program(s) not given or format not recognized");
+            logger.error("Path to input program(s) not given or format not recognized");
+            System.exit(UNKNOWN_ERROR.asInt());
+
         }
         return files;
     }
