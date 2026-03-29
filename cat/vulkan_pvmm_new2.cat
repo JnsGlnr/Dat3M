@@ -22,11 +22,9 @@ VULKAN
 (*******************)
 
 (* Tags *)
-/*
 let QF = QF | DV
 let WG = WG | QF
 let SG = SG | WG
-*/
 
 let vloc = vloc & loc
 
@@ -55,7 +53,7 @@ let SEMSC123 = SEMSC12 & SEMSC3
 let SEMSC0123 = SEMSC012 & SEMSC3
 
 (* Relations *)
-let inscope = (DV * DV) | (sqf & ((QF | DV) * (QF | DV))) | (swg & ((WG | QF | DV) * (WG | QF | DV))) | (ssg & ((SG | WG | QF | DV) * (SG | WG | QF | DV)))
+let inscope = (DV * DV) | (sqf & (QF * QF)) | (swg & (WG * WG)) | (ssg & (SG * SG))
 let mutordatom = (vloc & inscope & (ATOM * ATOM)) \ id
 let asmo = co & mutordatom
 
@@ -99,120 +97,45 @@ let ithb23 = ithb(SC23, SEMSC23)
 let hb = po | ithb0 | ithb1 | ithb2 | ithb3 |
          ithb01 | ithb02 | ithb03 | ithb12 | ithb13 | ithb23
 
-/*
-let avsgl0 = vloc & ([SC0 & W]; (po | (ithb0 & ssg))?; [(SG | WG | QF | DV) & SC0 & W])
-let avwgl0 = vloc & ([SC0 & W]; (po | (ithb0 & swg))?; [(WG | QF | DV) & SC0 & W])
-let avqfl0 = vloc & ([SC0 & W]; (po | (ithb0 & sqf))?; [(QF | DV) & SC0 & W])
-let avdvl0 = vloc & ([SC0 & W]; (po | ithb0)?; [DV & SC0 & W])
+let avsg0 = [SC0 & W]; ((po; [SEMAV & SEMSC0]) | (vloc & (po; [W])))?; [SG]; ((chains & ithb0 & ssg); [SG & SEMAV & SEMSC0])?
+let avwg0 = (avsg0 | (vloc & (avsg0; (ithb0 & ssg); [W]))); [WG]; ((chains & ithb0 & swg); [WG & SEMAV & SEMSC0])?
+let avqf0 = (avwg0 | (vloc & (avwg0; (ithb0 & swg); [W]))); [QF]; ((chains & ithb0 & sqf); [QF & SEMAV & SEMSC0])?
+let avdv0 = (avqf0 | (vloc & (avqf0; (ithb0 & sqf); [W]))); [DV]; ((chains & ithb0); [DV & SEMAV & SEMSC0])?
 
-let avsgl1 = vloc & ([SC1 & W]; (po | (ithb1 & ssg))?; [(SG | WG | QF | DV) & SC1 & W])
-let avwgl1 = vloc & ([SC1 & W]; (po | (ithb1 & swg))?; [(WG | QF | DV) & SC1 & W])
-let avqfl1 = vloc & ([SC1 & W]; (po | (ithb1 & sqf))?; [(QF | DV) & SC1 & W])
-let avdvl1 = vloc & ([SC1 & W]; (po | ithb1)?; [DV & SC1 & W])
+let avsg1 = [SC1 & W]; ((po; [SEMAV & SEMSC1]) | (vloc & (po; [W])))?; [SG]; ((chains & ithb1 & ssg); [SG & SEMAV & SEMSC1])?
+let avwg1 = (avsg1 | (vloc & (avsg1; (ithb1 & ssg); [W]))); [WG]; ((chains & ithb1 & swg); [WG & SEMAV & SEMSC1])?
+let avqf1 = (avwg1 | (vloc & (avwg1; (ithb1 & swg); [W]))); [QF]; ((chains & ithb1 & sqf); [QF & SEMAV & SEMSC1])?
+let avdv1 = (avqf1 | (vloc & (avqf1; (ithb1 & sqf); [W]))); [DV]; ((chains & ithb1); [DV & SEMAV & SEMSC1])?
 
-let avsgl2 = vloc & ([SC2 & W]; (po | (ithb2 & ssg))?; [(SG | WG | QF | DV) & SC2 & W])
-let avwgl2 = vloc & ([SC2 & W]; (po | (ithb2 & swg))?; [(WG | QF | DV) & SC2 & W])
-let avqfl2 = vloc & ([SC2 & W]; (po | (ithb2 & sqf))?; [(QF | DV) & SC2 & W])
-let avdvl2 = vloc & ([SC2 & W]; (po | ithb2)?; [DV & SC2 & W])
+let avsg2 = [SC2 & W]; ((po; [SEMAV & SEMSC2]) | (vloc & (po; [W])))?; [SG]; ((chains & ithb2 & ssg); [SG & SEMAV & SEMSC2])?
+let avwg2 = (avsg2 | (vloc & (avsg2; (ithb2 & ssg); [W]))); [WG]; ((chains & ithb2 & swg); [WG & SEMAV & SEMSC2])?
+let avqf2 = (avwg2 | (vloc & (avwg2; (ithb2 & swg); [W]))); [QF]; ((chains & ithb2 & sqf); [QF & SEMAV & SEMSC2])?
+let avdv2 = (avqf2 | (vloc & (avqf2; (ithb2 & sqf); [W]))); [DV]; ((chains & ithb2); [DV & SEMAV & SEMSC2])?
 
-let avsgl3 = vloc & ([SC3 & W]; (po | (ithb3 & ssg))?; [(SG | WG | QF | DV) & SC3 & W])
-let avwgl3 = vloc & ([SC3 & W]; (po | (ithb3 & swg))?; [(WG | QF | DV) & SC3 & W])
-let avqfl3 = vloc & ([SC3 & W]; (po | (ithb3 & sqf))?; [(QF | DV) & SC3 & W])
-let avdvl3 = vloc & ([SC3 & W]; (po | ithb3)?; [DV & SC3 & W])
-*/
-/*
-let avsgl0 = vloc & ([SC0 & W]; po?; [(SG | WG | QF | DV) & SC0 & W])
-let avwgl0 = vloc & (avsgl0; (ithb0 & ssg)?; [(WG | QF | DV) & SC0 & W])
-let avqfl0 = vloc & (avwgl0; (ithb0 & swg)?; [(QF | DV) & SC0 & W])
-let avdvl0 = vloc & (avqfl0; (ithb0 & sqf)?; [DV & SC0 & W])
+let avsg3 = [SC3 & W]; ((po; [SEMAV & SEMSC3]) | (vloc & (po; [W])))?; [SG]; ((chains & ithb3 & ssg); [SG & SEMAV & SEMSC3])?
+let avwg3 = (avsg3 | (vloc & (avsg3; (ithb3 & ssg); [W]))); [WG]; ((chains & ithb3 & swg); [WG & SEMAV & SEMSC3])?
+let avqf3 = (avwg3 | (vloc & (avwg3; (ithb3 & swg); [W]))); [QF]; ((chains & ithb3 & sqf); [QF & SEMAV & SEMSC3])?
+let avdv3 = (avqf3 | (vloc & (avqf3; (ithb3 & sqf); [W]))); [DV]; ((chains & ithb3); [DV & SEMAV & SEMSC3])?
 
-let avsgl1 = vloc & ([SC1 & W]; po?; [(SG | WG | QF | DV) & SC1 & W])
-let avwgl1 = vloc & (avsgl1; (ithb1 & ssg)?; [(WG | QF | DV) & SC1 & W])
-let avqfl1 = vloc & (avwgl1; (ithb1 & swg)?; [(QF | DV) & SC1 & W])
-let avdvl1 = vloc & (avqfl1; (ithb1 & sqf)?; [DV & SC1 & W])
+let vissg0 = ([SG & SEMVIS & SEMSC0]; (chains & ithb0 & ssg))?; [SG]; (([SEMVIS & SEMSC0]; po) | (vloc & ([R]; po)))?; [SC0 & R]
+let viswg0 = ([WG & SEMVIS & SEMSC0]; (chains & ithb0 & swg))?; [WG]; (vissg0 | (vloc & ([R]; (ssg & ithb0)?; vissg0)))
+let visqf0 = ([QF & SEMVIS & SEMSC0]; (chains & ithb0 & sqf))?; [QF]; (viswg0 | (vloc & ([R]; (swg & ithb0)?; viswg0)))
+let visdv0 = ([DV & SEMVIS & SEMSC0]; (chains & ithb0))?; [DV]; (visqf0 | (vloc & ([R]; (sqf & ithb0)?; visqf0)))
 
-let avsgl2 = vloc & ([SC2 & W]; po?; [(SG | WG | QF | DV) & SC2 & W])
-let avwgl2 = vloc & (avsgl2; (ithb2 & ssg)?; [(WG | QF | DV) & SC2 & W])
-let avqfl2 = vloc & (avwgl2; (ithb2 & swg)?; [(QF | DV) & SC2 & W])
-let avdvl2 = vloc & (avqfl2; (ithb2 & sqf)?; [DV & SC2 & W])
+let vissg1 = ([SG & SEMVIS & SEMSC1]; (chains & ithb1 & ssg))?; [SG]; (([SEMVIS & SEMSC1]; po) | (vloc & ([R]; po)))?; [SC1 & R]
+let viswg1 = ([WG & SEMVIS & SEMSC1]; (chains & ithb1 & swg))?; [WG]; (vissg1 | (vloc & ([R]; (ssg & ithb1)?; vissg1)))
+let visqf1 = ([QF & SEMVIS & SEMSC1]; (chains & ithb1 & sqf))?; [QF]; (viswg1 | (vloc & ([R]; (swg & ithb1)?; viswg1)))
+let visdv1 = ([DV & SEMVIS & SEMSC1]; (chains & ithb1))?; [DV]; (visqf1 | (vloc & ([R]; (sqf & ithb1)?; visqf1)))
 
-let avsgl3 = vloc & ([SC3 & W]; po?; [(SG | WG | QF | DV) & SC3 & W])
-let avwgl3 = vloc & (avsgl3; (ithb3 & ssg)?; [(WG | QF | DV) & SC3 & W])
-let avqfl3 = vloc & (avwgl3; (ithb3 & swg)?; [(QF | DV) & SC3 & W])
-let avdvl3 = vloc & (avqfl3; (ithb3 & sqf)?; [DV & SC3 & W])
-*/
+let vissg2 = ([SG & SEMVIS & SEMSC2]; (chains & ithb2 & ssg))?; [SG]; (([SEMVIS & SEMSC2]; po) | (vloc & ([R]; po)))?; [SC2 & R]
+let viswg2 = ([WG & SEMVIS & SEMSC2]; (chains & ithb2 & swg))?; [WG]; (vissg2 | (vloc & ([R]; (ssg & ithb2)?; vissg2)))
+let visqf2 = ([QF & SEMVIS & SEMSC2]; (chains & ithb2 & sqf))?; [QF]; (viswg2 | (vloc & ([R]; (swg & ithb2)?; viswg2)))
+let visdv2 = ([DV & SEMVIS & SEMSC2]; (chains & ithb2))?; [DV]; (visqf2 | (vloc & ([R]; (sqf & ithb2)?; visqf2)))
 
-let avsgl0 = vloc & ([SC0 & W]; po?; [(SG | WG | QF | DV) & SC0 & W])
-let avsg0 = (avsgl0 | ([SC0 & W]; po; [(SG | WG | QF | DV) & SEMAV & SEMSC0])); ((chains & ithb0 & ssg); [(SG | WG | QF | DV) & SEMAV & SEMSC0])?
-let avwgl0 = vloc & (avsg0; (ithb0 & ssg)?; [(WG | QF | DV) & SC0 & W])
-let avwg0 = (avwgl0 | (avsg0; [WG | QF | DV])); ((chains & ithb0 & swg); [(WG | QF | DV) & SEMAV & SEMSC0])?
-let avqfl0 = vloc & (avwg0; (ithb0 & swg)?; [(QF | DV) & SC0 & W])
-let avqf0 = (avqfl0 | (avwg0; [QF | DV])); ((chains & ithb0 & sqf); [(QF | DV) & SEMAV & SEMSC0])?
-let avdvl0 = vloc & (avqf0; (ithb0 & sqf)?; [DV & SC0 & W])
-let avdv0 = (avdvl0 | (avqf0; [DV])); ((chains & ithb0); [DV & SEMAV & SEMSC0])?
-
-let avsgl1 = vloc & ([SC1 & W]; po?; [(SG | WG | QF | DV) & SC1 & W])
-let avsg1 = (avsgl1 | ([SC1 & W]; po; [(SG | WG | QF | DV) & SEMAV & SEMSC1])); ((chains & ithb1 & ssg); [(SG | WG | QF | DV) & SEMAV & SEMSC1])?
-let avwgl1 = vloc & (avsg1; (ithb1 & ssg)?; [(WG | QF | DV) & SC1 & W])
-let avwg1 = (avwgl1 | (avsg1; [WG | QF | DV])); ((chains & ithb1 & swg); [(WG | QF | DV) & SEMAV & SEMSC1])?
-let avqfl1 = vloc & (avwg1; (ithb1 & swg)?; [(QF | DV) & SC1 & W])
-let avqf1 = (avqfl1 | (avwg1; [QF | DV])); ((chains & ithb1 & sqf); [(QF | DV) & SEMAV & SEMSC1])?
-let avdvl1 = vloc & (avqf1; (ithb1 & sqf)?; [DV & SC1 & W])
-let avdv1 = (avdvl1 | (avqf1; [DV])); ((chains & ithb1); [DV & SEMAV & SEMSC1])?
-
-let avsgl2 = vloc & ([SC2 & W]; po?; [(SG | WG | QF | DV) & SC2 & W])
-let avsg2 = (avsgl2 | ([SC2 & W]; po; [(SG | WG | QF | DV) & SEMAV & SEMSC2])); ((chains & ithb2 & ssg); [(SG | WG | QF | DV) & SEMAV & SEMSC2])?
-let avwgl2 = vloc & (avsg2; (ithb2 & ssg)?; [(WG | QF | DV) & SC2 & W])
-let avwg2 = (avwgl2 | (avsg2; [WG | QF | DV])); ((chains & ithb2 & swg); [(WG | QF | DV) & SEMAV & SEMSC2])?
-let avqfl2 = vloc & (avwg2; (ithb2 & swg)?; [(QF | DV) & SC2 & W])
-let avqf2 = (avqfl2 | (avwg2; [QF | DV])); ((chains & ithb2 & sqf); [(QF | DV) & SEMAV & SEMSC2])?
-let avdvl2 = vloc & (avqf2; (ithb2 & sqf)?; [DV & SC2 & W])
-let avdv2 = (avdvl2 | (avqf2; [DV])); ((chains & ithb2); [DV & SEMAV & SEMSC2])?
-
-let avsgl3 = vloc & ([SC3 & W]; po?; [(SG | WG | QF | DV) & SC3 & W])
-let avsg3 = (avsgl3 | ([SC3 & W]; po; [(SG | WG | QF | DV) & SEMAV & SEMSC3])); ((chains & ithb3 & ssg); [(SG | WG | QF | DV) & SEMAV & SEMSC3])?
-let avwgl3 = vloc & (avsg3; (ithb3 & ssg)?; [(WG | QF | DV) & SC3 & W])
-let avwg3 = (avwgl3 | (avsg3; [WG | QF | DV])); ((chains & ithb3 & swg); [(WG | QF | DV) & SEMAV & SEMSC3])?
-let avqfl3 = vloc & (avwg3; (ithb3 & swg)?; [(QF | DV) & SC3 & W])
-let avqf3 = (avqfl3 | (avwg3; [QF | DV])); ((chains & ithb3 & sqf); [(QF | DV) & SEMAV & SEMSC3])?
-let avdvl3 = vloc & (avqf3; (ithb3 & sqf)?; [DV & SC3 & W])
-let avdv3 = (avdvl3 | (avqf3; [DV])); ((chains & ithb3); [DV & SEMAV & SEMSC3])?
-
-let vissgl0 = vloc & ([(SG | WG | QF | DV) & SC0 & R]; po?; [SC0 & R])
-let vissg0 = ([(SG | WG | QF | DV) & SEMVIS & SEMSC0]; (chains & ithb0 & ssg))?; (([(SG | WG | QF | DV) & SEMVIS & SEMSC0]; po; [SC0 & R]) | vissgl0)
-let viswgl0 = vloc & ([(WG | QF | DV) & SC0 & R]; (ssg & ithb0)?; vissg0)
-let viswg0 = ([(WG | QF | DV) & SEMVIS & SEMSC0]; (chains & ithb0 & swg))?; (([WG | QF | DV]; vissg0) | viswgl0)
-let visqfl0 = vloc & ([(QF | DV) & SC0 & R]; (swg & ithb0)?; viswg0)
-let visqf0 = ([(QF | DV) & SEMVIS & SEMSC0]; (chains & ithb0 & sqf))?; (([QF | DV]; viswg0) | visqfl0)
-let visdvl0 = vloc & ([DV & SC0 & R]; (sqf & ithb0)?; visqf0)
-let visdv0 = ([DV & SEMVIS & SEMSC0]; (chains & ithb0))?; (([DV]; visqf0) | visdvl0)
-
-let vissgl1 = vloc & ([(SG | WG | QF | DV) & SC1 & R]; po?; [SC1 & R])
-let vissg1 = ([(SG | WG | QF | DV) & SEMVIS & SEMSC1]; (chains & ithb1 & ssg))?; (([(SG | WG | QF | DV) & SEMVIS & SEMSC1]; po; [SC1 & R]) | vissgl1)
-let viswgl1 = vloc & ([(WG | QF | DV) & SC1 & R]; (ssg & ithb1)?; vissg1)
-let viswg1 = ([(WG | QF | DV) & SEMVIS & SEMSC1]; (chains & ithb1 & swg))?; (([WG | QF | DV]; vissg1) | viswgl1)
-let visqfl1 = vloc & ([(QF | DV) & SC1 & R]; (swg & ithb1)?; viswg1)
-let visqf1 = ([(QF | DV) & SEMVIS & SEMSC1]; (chains & ithb1 & sqf))?; (([QF | DV]; viswg1) | visqfl1)
-let visdvl1 = vloc & ([DV & SC1 & R]; (sqf & ithb1)?; visqf1)
-let visdv1 = ([DV & SEMVIS & SEMSC1]; (chains & ithb1))?; (([DV]; visqf1) | visdvl1)
-
-let vissgl2 = vloc & ([(SG | WG | QF | DV) & SC2 & R]; po?; [SC2 & R])
-let vissg2 = ([(SG | WG | QF | DV) & SEMVIS & SEMSC2]; (chains & ithb2 & ssg))?; (([(SG | WG | QF | DV) & SEMVIS & SEMSC2]; po; [SC2 & R]) | vissgl2)
-let viswgl2 = vloc & ([(WG | QF | DV) & SC2 & R]; (ssg & ithb2)?; vissg2)
-let viswg2 = ([(WG | QF | DV) & SEMVIS & SEMSC2]; (chains & ithb2 & swg))?; (([WG | QF | DV]; vissg2) | viswgl2)
-let visqfl2 = vloc & ([(QF | DV) & SC2 & R]; (swg & ithb2)?; viswg2)
-let visqf2 = ([(QF | DV) & SEMVIS & SEMSC2]; (chains & ithb2 & sqf))?; (([QF | DV]; viswg2) | visqfl2)
-let visdvl2 = vloc & ([DV & SC2 & R]; (sqf & ithb2)?; visqf2)
-let visdv2 = ([DV & SEMVIS & SEMSC2]; (chains & ithb2))?; (([DV]; visqf2) | visdvl2)
-
-let vissgl3 = vloc & ([(SG | WG | QF | DV) & SC3 & R]; po?; [SC3 & R])
-let vissg3 = ([(SG | WG | QF | DV) & SEMVIS & SEMSC3]; (chains & ithb3 & ssg))?; (([(SG | WG | QF | DV) & SEMVIS & SEMSC3]; po; [SC3 & R]) | vissgl3)
-let viswgl3 = vloc & ([(WG | QF | DV) & SC3 & R]; (ssg & ithb3)?; vissg3)
-let viswg3 = ([(WG | QF | DV) & SEMVIS & SEMSC3]; (chains & ithb3 & swg))?; (([WG | QF | DV]; vissg3) | viswgl3)
-let visqfl3 = vloc & ([(QF | DV) & SC3 & R]; (swg & ithb3)?; viswg3)
-let visqf3 = ([(QF | DV) & SEMVIS & SEMSC3]; (chains & ithb3 & sqf))?; (([QF | DV]; viswg3) | visqfl3)
-let visdvl3 = vloc & ([DV & SC3 & R]; (sqf & ithb3)?; visqf3)
-let visdv3 = ([DV & SEMVIS & SEMSC3]; (chains & ithb3))?; (([DV]; visqf3) | visdvl3)
+let vissg3 = ([SG & SEMVIS & SEMSC3]; (chains & ithb3 & ssg))?; [SG]; (([SEMVIS & SEMSC3]; po) | (vloc & ([R]; po)))?; [SC3 & R]
+let viswg3 = ([WG & SEMVIS & SEMSC3]; (chains & ithb3 & swg))?; [WG]; (vissg3 | (vloc & ([R]; (ssg & ithb3)?; vissg3)))
+let visqf3 = ([QF & SEMVIS & SEMSC3]; (chains & ithb3 & sqf))?; [QF]; (viswg3 | (vloc & ([R]; (swg & ithb3)?; viswg3)))
+let visdv3 = ([DV & SEMVIS & SEMSC3]; (chains & ithb3))?; [DV]; (visqf3 | (vloc & ([R]; (sqf & ithb3)?; visqf3)))
 
 let locordww = (avsg0; (ithb0 & ssg)) | (avwg0; (ithb0 & swg)) | (avqf0; (ithb0 & sqf)) | (avdv0; ithb0) |
                (avsg1; (ithb1 & ssg)) | (avwg1; (ithb1 & swg)) | (avqf1; (ithb1 & sqf)) | (avdv1; ithb1) |
