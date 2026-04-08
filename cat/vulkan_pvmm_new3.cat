@@ -77,11 +77,11 @@ let sw = inscope & (
     ([REL & F]; po?; [CBAR]; ((syncbar & inscope) \ id); [CBAR]; po?; [ACQ & F])                        // fence->cbar->cbar->fence,
 )
 
-let ithb(SC, SEMSC) = (ssw |
+let ithb(SC, SEMSC) = ((SC * SC) & rf & mutordatom) | (((SC * SC) & rf & mutordatom)?; (ssw |
         ([SEMSC]; sw; [SEMSC]) |
         ([(NONPRIV & SC) | SEMSC]; po; [REL & SEMSC]) |
         ([ACQ & SEMSC]; po; [(NONPRIV & SC) | SEMSC])
-    )+
+    )+)
 
 let ithb0 = ithb(SC0, SEMSC0)
 let ithb1 = ithb(SC1, SEMSC1)
@@ -123,19 +123,19 @@ let visqf0 = [QF]; ([SEMVIS & SEMSC0]; (chains & ithb0 & swg))?; viswg0; (vloc &
 let visdv0 = [DV]; ([SEMVIS & SEMSC0]; (chains & ithb0 & sqf))?; visqf0; (vloc & ((sqf & ithb0); visqf0))?
 
 let vissg1 = [SG]; (([SEMVIS & SEMSC1]; po) | (vloc & ([R]; po)))?; [SC1 & R & NONPRIV]
-let viswg1 = [WG]; ([SEMVIS & SEMSC1]; (chains & ithb1 & ssg))?; vissg1; (vloc & ((ssg & ithb0); vissg1))?
-let visqf1 = [QF]; ([SEMVIS & SEMSC1]; (chains & ithb1 & swg))?; viswg1; (vloc & ((swg & ithb0); viswg1))?
-let visdv1 = [DV]; ([SEMVIS & SEMSC1]; (chains & ithb1 & sqf))?; visqf1; (vloc & ((sqf & ithb0); visqf1))?
+let viswg1 = [WG]; ([SEMVIS & SEMSC1]; (chains & ithb1 & ssg))?; vissg1; (vloc & ((ssg & ithb1); vissg1))?
+let visqf1 = [QF]; ([SEMVIS & SEMSC1]; (chains & ithb1 & swg))?; viswg1; (vloc & ((swg & ithb1); viswg1))?
+let visdv1 = [DV]; ([SEMVIS & SEMSC1]; (chains & ithb1 & sqf))?; visqf1; (vloc & ((sqf & ithb1); visqf1))?
 
 let vissg2 = [SG]; (([SEMVIS & SEMSC2]; po) | (vloc & ([R]; po)))?; [SC2 & R & NONPRIV]
-let viswg2 = [WG]; ([SEMVIS & SEMSC2]; (chains & ithb2 & ssg))?; vissg2; (vloc & ((ssg & ithb0); vissg2))?
-let visqf2 = [QF]; ([SEMVIS & SEMSC2]; (chains & ithb2 & swg))?; viswg2; (vloc & ((swg & ithb0); viswg2))?
-let visdv2 = [DV]; ([SEMVIS & SEMSC2]; (chains & ithb2 & sqf))?; visqf2; (vloc & ((sqf & ithb0); visqf2))?
+let viswg2 = [WG]; ([SEMVIS & SEMSC2]; (chains & ithb2 & ssg))?; vissg2; (vloc & ((ssg & ithb2); vissg2))?
+let visqf2 = [QF]; ([SEMVIS & SEMSC2]; (chains & ithb2 & swg))?; viswg2; (vloc & ((swg & ithb2); viswg2))?
+let visdv2 = [DV]; ([SEMVIS & SEMSC2]; (chains & ithb2 & sqf))?; visqf2; (vloc & ((sqf & ithb2); visqf2))?
 
 let vissg3 = [SG]; (([SEMVIS & SEMSC3]; po) | (vloc & ([R]; po)))?; [SC3 & R & NONPRIV]
-let viswg3 = [WG]; ([SEMVIS & SEMSC3]; (chains & ithb3 & ssg))?; vissg3; (vloc & ((ssg & ithb0); vissg3))?
-let visqf3 = [QF]; ([SEMVIS & SEMSC3]; (chains & ithb3 & swg))?; viswg3; (vloc & ((swg & ithb0); viswg3))?
-let visdv3 = [DV]; ([SEMVIS & SEMSC3]; (chains & ithb3 & sqf))?; visqf3; (vloc & ((sqf & ithb0); visqf3))?
+let viswg3 = [WG]; ([SEMVIS & SEMSC3]; (chains & ithb3 & ssg))?; vissg3; (vloc & ((ssg & ithb3); vissg3))?
+let visqf3 = [QF]; ([SEMVIS & SEMSC3]; (chains & ithb3 & swg))?; viswg3; (vloc & ((swg & ithb3); viswg3))?
+let visdv3 = [DV]; ([SEMVIS & SEMSC3]; (chains & ithb3 & sqf))?; visqf3; (vloc & ((sqf & ithb3); visqf3))?
 
 let locordww = (avsg0; (ithb0 & ssg)) | (avwg0; (ithb0 & swg)) | (avqf0; (ithb0 & sqf)) | (avdv0; ithb0) |
                (avsg1; (ithb1 & ssg)) | (avwg1; (ithb1 & swg)) | (avqf1; (ithb1 & sqf)) | (avdv1; ithb1) |
@@ -151,33 +151,23 @@ let schb = ([SC0]; ithb0) | ([SC1]; ithb1) | ([SC2]; ithb2) | ([SC3]; ithb3)
 let hbsc = (ithb0; [SC0]) | (ithb1; [SC1]) | (ithb2; [SC2]) | (ithb3; [SC3])
 let schbsc = (ithb0 & (SC0 * SC0)) | (ithb1 & (SC1 * SC1)) | (ithb2 & (SC2 * SC2)) | (ithb3 & (SC3 * SC3))
 let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
-              (ithb02 & ((SC0 * SC1) | (SC1 * SC0))) |
-              (ithb03 & ((SC0 * SC1) | (SC1 * SC0))) |
-              (ithb12 & ((SC0 * SC1) | (SC1 * SC0))) |
-              (ithb13 & ((SC0 * SC1) | (SC1 * SC0))) |
-              (ithb23 & ((SC0 * SC1) | (SC1 * SC0)))
+              (ithb02 & ((SC0 * SC2) | (SC2 * SC0))) |
+              (ithb03 & ((SC0 * SC3) | (SC3 * SC0))) |
+              (ithb12 & ((SC1 * SC2) | (SC2 * SC1))) |
+              (ithb13 & ((SC1 * SC3) | (SC3 * SC1))) |
+              (ithb23 & ((SC2 * SC3) | (SC3 * SC2)))
 
-// TODO: IW * ...
 let locord = loc & (
-    (IW * (W \ IW)) |
     ([R]; ssw+; [W]) |
     ([W]; schb; [AVDEVICE]; hbsc; [W]) |
     ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]) |
-    ([R & NONPRIV]; (po | schbsc | schbsca); [W & NONPRIV]) |
+    ([R & NONPRIV]; (schbsc | schbsca); [W & NONPRIV]) |
     vloc & (
-        ((po | schbsc) & int) |
+        ((po | schbsc) & int) | // TODO:
         ([W & NONPRIV]; locordww; [W & NONPRIV]) |
         ([W & NONPRIV]; locordrr; [R & NONPRIV])
     )
 )
-
-// From-read is defined based on scoped modification order
-// instead of coherence. For reads that read-from init, they
-// from-read all writes at the same location.
-
-// The definition of the original Vulkan model is too restrictive and forbids CoWW-RR
-// let fr = (rf^-1 ; ((W * W) & locord)) | (rf^-1; asmo) | (([IW]; rf)^-1; ((loc;[W]) \ id))
-// let fr = ((rf & locord)^-1 ; (W * W) & locord) | (rf^-1; asmo) | (([IW]; rf)^-1; ((loc;[W]) \ id))
 
 (***********************)
 (* Memory Model Axioms *)
@@ -186,12 +176,11 @@ let locord = loc & (
 // locord, rf, fr, asmo must not form cycles
 acyclic (locord | rf | fr | asmo) as consistency-cycle
 
-// non-atomic cannot read-from a value that is shadowed by another write
+// load cannot read-from a value that is shadowed by another write
 empty rf & ([W]; locord; ([W]; locord)+) as consistency-rf
-// empty (rf; ([R \ ATOM])) & (([W]; locord); ([W]; locord)+) as consistency-rf
 
 // rmw events are atomic
-empty rmw & ((fr & ext); (asmo & ext)) as atomic
+empty rmw & ((fr & ext); (co & ext)) as atomic
 
 // coherence order cannot contradict locord
 empty ((W * W) & locord) \ co
