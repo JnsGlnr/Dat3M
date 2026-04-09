@@ -158,12 +158,12 @@ let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
               (ithb23 & ((SC2 * SC3) | (SC3 * SC2)))
 
 let locord = loc & (
-    ([R]; ssw+; [R | W]) |
+    ([R]; ssw+; [W]) |
     ([W]; schb; [AVDEVICE]; hbsc; [W]) |
     ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]) |
-    ([R & NONPRIV]; (schbsc | schbsca); [(R | W) & NONPRIV]) |
+    ([R & NONPRIV]; (schbsc | schbsca); [W & NONPRIV]) |
     vloc & (
-        ((po | schbsc) & int) |
+        ((po | schbsc) & int) | // TODO:
         ([W & NONPRIV]; locordww; [W & NONPRIV]) |
         ([W & NONPRIV]; locordrr; [R & NONPRIV])
     )
@@ -174,8 +174,7 @@ let locord = loc & (
 (***********************)
 
 // locord, rf, fr, asmo must not form cycles
-let sfr = rf^-1; (asmo | (loc & (IW * (W \ IW))))
-acyclic (locord | rf | sfr | asmo) as consistency-cycle
+acyclic (locord | rf | fr | asmo) as consistency-cycle
 
 // load cannot read-from a value that is shadowed by another write
 empty rf & ([W]; locord; ([W]; locord)+) as consistency-rf
