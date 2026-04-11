@@ -7,6 +7,12 @@ test,vulkan_pvmm,vulkan_pvmm_avvisinc_chains2,vulkan_pvmm_new,vulkan_pvmm_new2,v
 2-f-graph-mp-avvis-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 2-f-graph-mp-avvis-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,,,
+3-f-graph-problem-semsc2-mp-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+3-f-graph-problem-semsc2-mp-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+3-f-graph-problem-semsc2-mp-c,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+3-f-graph-problem-semsc2-mp-fences-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+3-f-graph-problem-semsc2-mp-fences-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+3-f-graph-problem-semsc2-mp-fences-c,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 3-f-graph-problem-semsc-mp-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 3-f-graph-problem-semsc-mp-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 3-f-graph-problem-semsc-mp-c,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
