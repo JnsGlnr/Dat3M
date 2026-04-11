@@ -180,6 +180,12 @@ public class PvmmTest {
                         mcm.addConstraint(new Emptiness(cycle, true, true));
                         Axiom axiomRf = removeAxiom(mcm, "consistency-rf");
                         mcm.addConstraint(new Emptiness(axiomRf.getRelation(), true, true));
+                        Axiom axiomAtomic = removeAxiom(mcm, "atomic");
+                        mcm.addConstraint(new Emptiness(axiomAtomic.getRelation(), true, true));
+                        Axiom axiomCo = removeAxiom(mcm, "consistent-co");
+                        if (axiomCo != null) {
+                            mcm.addConstraint(new Emptiness(axiomCo.getRelation(), true, true));
+                        }
                         program.setFilterSpecification(program.getSpecification());
                         property = CAT_SPEC;
                     }
@@ -230,13 +236,16 @@ public class PvmmTest {
     }
 
     private Axiom removeAxiom(Wmm wmm, String name) {
-        Axiom axiom = wmm.getConstraints().stream()
+        Optional<Axiom> axiom = wmm.getConstraints().stream()
                 .filter(c -> c instanceof Axiom)
                 .map(c -> (Axiom)c)
                 .filter(c -> name.equals(c.getName()))
-                .findFirst().orElseThrow();
-        wmm.removeConstraint(axiom);
-        return axiom;
+                .findFirst();
+        if (axiom.isPresent()) {
+            wmm.removeConstraint(axiom.get());
+            return axiom.get();
+        }
+        return null;
     }
 
     private Map<String, MutableEventGraph> extractRelationsData(

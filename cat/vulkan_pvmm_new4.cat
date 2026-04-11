@@ -183,7 +183,7 @@ empty rf & ([W]; locord; ([W]; locord)+) as consistency-rf
 empty rmw & ((fr & ext); (co & ext)) as atomic
 
 // coherence order cannot contradict locord
-empty ((W * W) & locord) \ co
+empty ((W * W) & locord) \ co as consistent-co
 
 (***************)
 (* Data Races *)
