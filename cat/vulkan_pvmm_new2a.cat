@@ -1,0 +1,223 @@
+VULKAN
+(* Vulkan Memory Model *)
+(* With availability-visibility chains supported *)
+
+// Base relations:
+// vloc: events accessing the same virtual location, aka "same reference (sref)" in the Vulkan spec
+// syncbar: synchronize by barriers with same logical barrier resource (barID)
+// ssg: same subgroup
+// swg: same workgroup
+// sqf: same queuefamily
+// ssw: system-synchronizes-with
+
+// Tags:
+// SC0, SC1, SC2, SC3: storage class 0, 1, 2, 3
+// SEMSC0, SEMSC1, SEMSC2, SEMSC3: storage class semantics 0, 1, 2, 3
+// SG, WG, QF, DV: subgroup, workgroup, queuefamily, device domains
+// AV, VIS: availability, visibility
+// AVDEVICE, VISDEVICE: availability, visibility op to the device domain
+
+(*******************)
+(*  Auxiliaries *)
+(*******************)
+
+(* Tags *)
+let QF = QF | DV
+let WG = WG | QF
+let SG = SG | WG
+
+let vloc = vloc & loc
+
+let SC01 = SC0 | SC1
+let SC02 = SC0 | SC2
+let SC03 = SC0 | SC3
+let SC12 = SC1 | SC2
+let SC13 = SC1 | SC3
+let SC23 = SC2 | SC3
+let SC012 = SC01 | SC2
+let SC013 = SC01 | SC3
+let SC023 = SC02 | SC3
+let SC123 = SC12 | SC3
+let SC0123 = SC012 | SC3
+
+let SEMSC01 = SEMSC0 & SEMSC1
+let SEMSC02 = SEMSC0 & SEMSC2
+let SEMSC03 = SEMSC0 & SEMSC3
+let SEMSC12 = SEMSC1 & SEMSC2
+let SEMSC13 = SEMSC1 & SEMSC3
+let SEMSC23 = SEMSC2 & SEMSC3
+let SEMSC012 = SEMSC01 & SEMSC2
+let SEMSC013 = SEMSC01 & SEMSC3
+let SEMSC023 = SEMSC02 & SEMSC3
+let SEMSC123 = SEMSC12 & SEMSC3
+let SEMSC0123 = SEMSC012 & SEMSC3
+
+(* Relations *)
+let inscope = (DV * DV) | (sqf & (QF * QF)) | (swg & (WG * WG)) | (ssg & (SG * SG))
+let mutordatom = (vloc & inscope & (ATOM * ATOM)) \ id
+let asmo = co & mutordatom
+
+let sc2sem = (SC0 * SEMSC0) | (SC1 * SEMSC1) | (SC2 * SEMSC2) | (SC3 * SEMSC3)
+let sem2sc = (SEMSC0 * SC0) | (SEMSC1 * SC1) | (SEMSC2 * SC2) | (SEMSC3 * SC3)
+
+let posctosem = po & sc2sem
+let posemtosc = po & sem2sc
+
+let imm(r) = r \ (r; r+)
+let rs = [REL & ATOM]; (imm(asmo); [RMW])*
+let hypors = [W & ATOM]; (imm(asmo); [RMW])*
+
+// synchronizes-with is similar to C++, with an additional case for fence->cbar->cbar->fence
+let sw = inscope & (
+    ([REL & ATOM]; rs; (rf & mutordatom); [ACQ & ATOM]) |                                               // atomic->atomic
+    ([REL & F]; posemtosc; [ATOM & W]; hypors; (rf & mutordatom); [ACQ & ATOM]) |                       // fence->atomic
+    ([REL & ATOM]; rs; (rf & mutordatom); [ATOM & R]; posctosem; [ACQ & F]) |                           // atomic->fence
+    ([REL & F]; posemtosc; [ATOM & W]; hypors; (rf & mutordatom); [ATOM & R]; posctosem; [ACQ & F]) |   // fence->fence
+    // (stor[CBAR]) terms are redundant because scbarinst is an equivalence relation on scbarinst, but they make the sequence of instructions more clear.
+    ([REL & F]; po?; [CBAR]; ((syncbar & inscope) \ id); [CBAR]; po?; [ACQ & F])                        // fence->cbar->cbar->fence,
+)
+
+let ithb(SC, SEMSC) = (ssw |
+        ([SEMSC]; sw; [SEMSC]) |
+        ([(NONPRIV & SC) | SEMSC]; po; [REL & SEMSC]) |
+        ([ACQ & SEMSC]; po; [(NONPRIV & SC) | SEMSC])
+    )+
+
+let ithb0 = ithb(SC0, SEMSC0)
+let ithb1 = ithb(SC1, SEMSC1)
+let ithb2 = ithb(SC2, SEMSC2)
+let ithb3 = ithb(SC3, SEMSC3)
+let ithb01 = ithb(SC01, SEMSC01)
+let ithb02 = ithb(SC02, SEMSC02)
+let ithb03 = ithb(SC03, SEMSC03)
+let ithb12 = ithb(SC12, SEMSC12)
+let ithb13 = ithb(SC13, SEMSC13)
+let ithb23 = ithb(SC23, SEMSC23)
+
+let hb = po | ithb0 | ithb1 | ithb2 | ithb3 |
+         ithb01 | ithb02 | ithb03 | ithb12 | ithb13 | ithb23
+
+let avsg0 = [SC0 & W & NONPRIV]; ((po; [SEMAV & SEMSC0]) | (vloc & (po; [W])))?; [SG]
+let avwg0 = avsg0; ((chains & ithb0 & ssg); [SEMAV & SEMSC0])?; [WG]
+let avqf0 = avwg0; ((chains & ithb0 & swg); [SEMAV & SEMSC0])?; [QF]
+let avdv0 = avqf0; ((chains & ithb0 & sqf); [SEMAV & SEMSC0])?; [DV]
+
+let avsg1 = [SC1 & W & NONPRIV]; ((po; [SEMAV & SEMSC1]) | (vloc & (po; [W])))?; [SG]
+let avwg1 = avsg1; ((chains & ithb1 & ssg); [SEMAV & SEMSC1])?; [WG]
+let avqf1 = avwg1; ((chains & ithb1 & swg); [SEMAV & SEMSC1])?; [QF]
+let avdv1 = avqf1; ((chains & ithb1 & sqf); [SEMAV & SEMSC1])?; [DV]
+
+let avsg2 = [SC2 & W & NONPRIV]; ((po; [SEMAV & SEMSC2]) | (vloc & (po; [W])))?; [SG]
+let avwg2 = avsg2; ((chains & ithb2 & ssg); [SEMAV & SEMSC2])?; [WG]
+let avqf2 = avwg2; ((chains & ithb2 & swg); [SEMAV & SEMSC2])?; [QF]
+let avdv2 = avqf2; ((chains & ithb2 & sqf); [SEMAV & SEMSC2])?; [DV]
+
+let avsg3 = [SC3 & W & NONPRIV]; ((po; [SEMAV & SEMSC3]) | (vloc & (po; [W])))?; [SG]
+let avwg3 = avsg3; ((chains & ithb3 & ssg); [SEMAV & SEMSC3])?; [WG]
+let avqf3 = avwg3; ((chains & ithb3 & swg); [SEMAV & SEMSC3])?; [QF]
+let avdv3 = avqf3; ((chains & ithb3 & sqf); [SEMAV & SEMSC3])?; [DV]
+
+let vissg0 = [SG]; (([SEMVIS & SEMSC0]; po) | (vloc & ([R]; po)))?; [SC0 & R & NONPRIV]
+let viswg0 = [WG]; ([SEMVIS & SEMSC0]; (chains & ithb0 & ssg))?; vissg0
+let visqf0 = [QF]; ([SEMVIS & SEMSC0]; (chains & ithb0 & swg))?; viswg0
+let visdv0 = [DV]; ([SEMVIS & SEMSC0]; (chains & ithb0 & sqf))?; visqf0
+
+let vissg1 = [SG]; (([SEMVIS & SEMSC1]; po) | (vloc & ([R]; po)))?; [SC1 & R & NONPRIV]
+let viswg1 = [WG]; ([SEMVIS & SEMSC1]; (chains & ithb1 & ssg))?; vissg1
+let visqf1 = [QF]; ([SEMVIS & SEMSC1]; (chains & ithb1 & swg))?; viswg1
+let visdv1 = [DV]; ([SEMVIS & SEMSC1]; (chains & ithb1 & sqf))?; visqf1
+
+let vissg2 = [SG]; (([SEMVIS & SEMSC2]; po) | (vloc & ([R]; po)))?; [SC2 & R & NONPRIV]
+let viswg2 = [WG]; ([SEMVIS & SEMSC2]; (chains & ithb2 & ssg))?; vissg2
+let visqf2 = [QF]; ([SEMVIS & SEMSC2]; (chains & ithb2 & swg))?; viswg2
+let visdv2 = [DV]; ([SEMVIS & SEMSC2]; (chains & ithb2 & sqf))?; visqf2
+
+let vissg3 = [SG]; (([SEMVIS & SEMSC3]; po) | (vloc & ([R]; po)))?; [SC3 & R & NONPRIV]
+let viswg3 = [WG]; ([SEMVIS & SEMSC3]; (chains & ithb3 & ssg))?; vissg3
+let visqf3 = [QF]; ([SEMVIS & SEMSC3]; (chains & ithb3 & swg))?; viswg3
+let visdv3 = [DV]; ([SEMVIS & SEMSC3]; (chains & ithb3 & sqf))?; visqf3
+
+let locordww = (avsg0; (ithb0 & ssg)) | (avwg0; (ithb0 & swg)) | (avqf0; (ithb0 & sqf)) | (avdv0; ithb0) |
+               (avsg1; (ithb1 & ssg)) | (avwg1; (ithb1 & swg)) | (avqf1; (ithb1 & sqf)) | (avdv1; ithb1) |
+               (avsg2; (ithb2 & ssg)) | (avwg2; (ithb2 & swg)) | (avqf2; (ithb2 & sqf)) | (avdv2; ithb2) |
+               (avsg3; (ithb3 & ssg)) | (avwg3; (ithb3 & swg)) | (avqf3; (ithb3 & sqf)) | (avdv3; ithb3)
+
+let locordwr = (avsg0; (ithb0 & ssg); vissg0) | (avwg0; (ithb0 & swg); viswg0) | (avqf0; (ithb0 & sqf); visqf0) | (avdv0; ithb0; visdv0) |
+               (avsg1; (ithb1 & ssg); vissg1) | (avwg1; (ithb1 & swg); viswg1) | (avqf1; (ithb1 & sqf); visqf1) | (avdv1; ithb1; visdv1) |
+               (avsg2; (ithb2 & ssg); vissg2) | (avwg2; (ithb2 & swg); viswg2) | (avqf2; (ithb2 & sqf); visqf2) | (avdv2; ithb2; visdv2) |
+               (avsg3; (ithb3 & ssg); vissg3) | (avwg3; (ithb3 & swg); viswg3) | (avqf3; (ithb3 & sqf); visqf3) | (avdv3; ithb3; visdv3)
+
+let locordrr = ([range(vissg0)]; (ithb0 & ssg); vissg0) | ([range(viswg0)]; (ithb0 & swg); viswg0) | ([range(visqf0)]; (ithb0 & sqf); visqf0) | ([range(visdv0)]; ithb0; visdv0) |
+               ([range(vissg1)]; (ithb1 & ssg); vissg1) | ([range(viswg1)]; (ithb1 & swg); viswg1) | ([range(visqf1)]; (ithb1 & sqf); visqf1) | ([range(visdv1)]; ithb1; visdv1) |
+               ([range(vissg2)]; (ithb2 & ssg); vissg2) | ([range(viswg2)]; (ithb2 & swg); viswg2) | ([range(visqf2)]; (ithb2 & sqf); visqf2) | ([range(visdv2)]; ithb2; visdv2) |
+               ([range(vissg3)]; (ithb3 & ssg); vissg3) | ([range(viswg3)]; (ithb3 & swg); viswg3) | ([range(visqf3)]; (ithb3 & sqf); visqf3) | ([range(visdv3)]; ithb3; visdv3)
+
+
+let schb = ([SC0]; ithb0) | ([SC1]; ithb1) | ([SC2]; ithb2) | ([SC3]; ithb3)
+let hbsc = (ithb0; [SC0]) | (ithb1; [SC1]) | (ithb2; [SC2]) | (ithb3; [SC3])
+let schbsc = (ithb0 & (SC0 * SC0)) | (ithb1 & (SC1 * SC1)) | (ithb2 & (SC2 * SC2)) | (ithb3 & (SC3 * SC3))
+let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
+              (ithb02 & ((SC0 * SC2) | (SC2 * SC0))) |
+              (ithb03 & ((SC0 * SC3) | (SC3 * SC0))) |
+              (ithb12 & ((SC1 * SC2) | (SC2 * SC1))) |
+              (ithb13 & ((SC1 * SC3) | (SC3 * SC1))) |
+              (ithb23 & ((SC2 * SC3) | (SC3 * SC2)))
+
+let locord-rr = loc & (
+   // ([R]; schb; [VISDEVICE]; hbsc; [R]) |
+    vloc & (
+        po | (schbsc & int) |
+        ([R & NONPRIV]; locordrr; [R & NONPRIV])
+    )
+)
+
+let locord-ww = loc & (
+    ([W]; schb; [AVDEVICE]; hbsc; [W]) |
+    vloc & (
+        po | (schbsc & int) |
+        ([W & NONPRIV]; locordww; [W & NONPRIV])
+    )
+)
+
+let locord-wr = loc & (
+    ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]) |
+    vloc & (
+        po | (schbsc & int) |
+        ([W & NONPRIV]; locordwr; [R & NONPRIV])
+    )
+)
+
+let locord-rw = loc & (
+    ([R]; ssw+; [W]) |
+    ([R & NONPRIV]; (schbsc | schbsca); [W & NONPRIV]) |
+    (vloc & (
+        po | (schbsc & int)
+    ))
+)
+
+let locord = locord-rr+ | locord-ww+ | ((locord-ww+)?; locord-wr; (locord-rr+)?) | locord-rw
+
+(***********************)
+(* Memory Model Axioms *)
+(***********************)
+
+// locord, rf, fr, asmo must not form cycles
+let sfr = rf^-1; (asmo | (loc & (IW * (W \ IW))))
+acyclic (locord | rf | sfr | asmo) as consistency-cycle
+
+// load cannot read-from a value that is shadowed by another write
+empty rf & ([W]; locord; ([W]; locord)+) as consistency-rf
+
+// rmw events are atomic
+empty rmw & ((fr & ext); (co & ext)) as atomic
+
+// coherence order cannot contradict locord
+empty ((W * W) & locord) \ co as consistent-co
+
+(***************)
+(* Data Races *)
+(***************)
+
+let pair_with_write = ((W * W) | (W * R) | (R * W)) \ ((IW * _) | (_ * IW)) // ignore IW
+let dr = loc & (pair_with_write \ mutordatom \ id \ (locord | locord^-1))
+flag ~empty dr as racy
