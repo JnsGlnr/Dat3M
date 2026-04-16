@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static com.dat3m.dartagnan.configuration.Arch.addVulkanPartialCoConstraints;
 import static com.dat3m.dartagnan.configuration.OptionNames.*;
 import static com.dat3m.dartagnan.utils.ResourceHelper.getRootPath;
 import static com.google.common.io.Files.getNameWithoutExtension;
@@ -146,19 +147,45 @@ public abstract class AbstractLitmusTest {
 
     @Test
     public void testAssume() throws Exception {
-        testModelChecker(Method.EAGER);
-    }
-
-    @Test
-    public void testRefinement() throws Exception {
-        testModelChecker(Method.LAZY);
-    }
-
-    protected void testModelChecker(Method method) throws Exception {
-        try (ModelChecker checker = ModelChecker.create(taskProvider.get(), method)) {
+        try (ModelChecker checker = ModelChecker.create(taskProvider.get(), Method.EAGER)) {
             checker.setShutdownManager(shutdownManagerProvider.get());
             checker.run();
             assertEquals(expected, checker.getResult());
         }
+    }
+
+    @Test
+    public void testRefinement() throws Exception {
+        try (ModelChecker checker = ModelChecker.create(taskProvider.get(), Method.LAZY)) {
+            checker.setShutdownManager(shutdownManagerProvider.get());
+            checker.run();
+            assertEquals(expected, checker.getResult());
+        }
+    }
+
+    @Test
+    public void testAssumePartialCo() throws Exception {
+        Arch.forcePartialCo = true;
+        VerificationTask task = taskProvider.get();
+        addVulkanPartialCoConstraints(task.getMemoryModel());
+        try (ModelChecker checker = ModelChecker.create(task, Method.EAGER)) {
+            checker.setShutdownManager(shutdownManagerProvider.get());
+            checker.run();
+            assertEquals(expected, checker.getResult());
+        }
+        Arch.forcePartialCo = false;
+    }
+
+    @Test
+    public void testRefinementPartialCo() throws Exception {
+        Arch.forcePartialCo = true;
+        VerificationTask task = taskProvider.get();
+        addVulkanPartialCoConstraints(task.getMemoryModel());
+        try (ModelChecker checker = ModelChecker.create(task, Method.LAZY)) {
+            checker.setShutdownManager(shutdownManagerProvider.get());
+            checker.run();
+            assertEquals(expected, checker.getResult());
+        }
+        Arch.forcePartialCo = false;
     }
 }
