@@ -26,6 +26,9 @@ test,vulkan_pvmm,vulkan_pvmm_avvisinc_chains2,vulkan_pvmm_new,vulkan_pvmm_new2,v
 3-f-graph-problem-semsc-lb-d,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 3-f-graph-problem-semsc-lb-d-acqrel,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,,,,
+3-problem-race-asmo,PASS,PASS,PASS,PASS,FAIL,PASS,PASS,PASS,PASS,PASS
+3-problem-race-asmo-alt,PASS,PASS,PASS,PASS,FAIL,PASS,PASS,PASS,PASS,PASS
+,,,,,,,,,,
 3-new-race-wrr-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 3-new-race-wrr-b,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 3-new-race-wrr-c,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
