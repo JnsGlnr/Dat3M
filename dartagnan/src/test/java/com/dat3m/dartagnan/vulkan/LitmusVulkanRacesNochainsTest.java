@@ -1,9 +1,11 @@
-package com.dat3m.dartagnan.litmus;
+package com.dat3m.dartagnan.vulkan;
 
 import com.dat3m.dartagnan.configuration.Arch;
 import com.dat3m.dartagnan.configuration.Property;
 import com.dat3m.dartagnan.utils.Result;
 import com.dat3m.dartagnan.utils.rules.Provider;
+import com.dat3m.dartagnan.utils.rules.Providers;
+import com.dat3m.dartagnan.wmm.Wmm;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -11,11 +13,11 @@ import java.io.IOException;
 import java.util.EnumSet;
 
 @RunWith(Parameterized.class)
-public class LitmusVulkanRacesTest extends AbstractLitmusTest {
+public class LitmusVulkanRacesNochainsTest extends AbstractLitmusTest {
 
     @Parameterized.Parameters(name = "{index}: {0}, {1}")
     public static Iterable<Object[]> data() throws IOException {
-        return buildLitmusTests("litmus/VULKAN/", "VULKAN", "-DR");
+        return buildLitmusTests("litmus/VULKAN/Data-Race/", "VULKAN", "-DR-NOCHAINS");
     }
 
     @Override
@@ -28,7 +30,12 @@ public class LitmusVulkanRacesTest extends AbstractLitmusTest {
         return Provider.fromSupplier(() -> EnumSet.of(Property.CAT_SPEC));
     }
 
-    public LitmusVulkanRacesTest(String path, Result expected) {
+    public LitmusVulkanRacesNochainsTest(String path, Result expected) {
         super(path, expected);
+    }
+
+    @Override
+    protected Provider<Wmm> getWmmProvider() {
+        return Providers.createWmmFromName(() -> "vulkan-nochains");
     }
 }

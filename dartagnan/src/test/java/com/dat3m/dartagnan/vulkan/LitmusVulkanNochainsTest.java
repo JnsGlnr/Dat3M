@@ -1,4 +1,4 @@
-package com.dat3m.dartagnan.litmus;
+package com.dat3m.dartagnan.vulkan;
 
 import com.dat3m.dartagnan.configuration.Arch;
 import com.dat3m.dartagnan.configuration.Property;
