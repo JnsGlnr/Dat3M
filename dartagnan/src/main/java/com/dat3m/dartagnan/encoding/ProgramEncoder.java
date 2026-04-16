@@ -494,44 +494,41 @@ public class ProgramEncoder {
         final ExpressionEncoder exprEncoder = context.getExpressionEncoder();
         final ExpressionFactory exprs = ExpressionFactory.getInstance();
 
-        List<BooleanFormula> enc = new ArrayList<>();
+        final List<BooleanFormula> enc = new ArrayList<>();
+        record RegisterState(boolean initialized, List<RegWriter> writers) {}
+        final Map<RegisterState, TypedFormula<?, ?>> state = new HashMap<>();
         for (RegReader reader : context.getTask().getProgram().getThreadEvents(RegReader.class)) {
             final ReachingDefinitionsAnalysis.Writers writers = definitions.getWriters(reader);
             for (Register register : writers.getUsedRegisters()) {
                 final List<BooleanFormula> overwrite = new ArrayList<>();
                 final ReachingDefinitionsAnalysis.RegisterWriters reg = writers.ofRegister(register);
+
+                // Encode that the dependency relationship comes from the latest executed writer.
                 for (RegWriter writer : reverse(reg.getMayWriters())) {
-                    BooleanFormula edge;
-                    if (reg.getMustWriters().contains(writer)) {
-                        if (exec.isImplied(reader, writer) && reader.cfImpliesExec()) {
-                            // This special case is important. Usually, we encode "dep => regValue = regWriterResult"
-                            // By getting rid of the guard "dep" in this special case, we end up with an unconditional
-                            // "regValue = regWriterResult", which allows the solver to eliminate one of the variables
-                            // in preprocessing.
-                            assert reg.getMayWriters().size() == 1;
-                            edge = bmgr.makeTrue();
-                        } else {
-                            edge = bmgr.and(context.execution(writer), context.controlFlow(reader));
-                        }
-                    } else {
-                        edge = context.dependency(writer, reader);
-                        enc.add(bmgr.equivalence(edge, bmgr.and(context.execution(writer), context.controlFlow(reader), bmgr.not(bmgr.or(overwrite)))));
+                    if (!reg.getMustWriters().contains(writer)) {
+                        enc.add(bmgr.equivalence(context.dependency(writer, reader),
+                                bmgr.and(context.execution(writer), context.controlFlow(reader), bmgr.not(bmgr.or(overwrite)))));
                     }
-                    BooleanFormula equalValue = exprEncoder.assignEqualAt(register, reader, context.result(writer), writer);
-                    enc.add(bmgr.implication(edge, equalValue));
                     overwrite.add(context.execution(writer));
                 }
 
-                if(initializeRegisters && !reg.mustBeInitialized()) {
-                    final Expression zero = exprs.makeGeneralZero(register.getType());
-                    overwrite.add(bmgr.not(context.controlFlow(reader)));
-                    overwrite.add(exprEncoder.assignEqualAt(register, reader, zero, reader));
-                    enc.add(bmgr.or(overwrite));
-                }
+                // Encode that the value equals the result of the latest executed writer.
+                final var registerState = new RegisterState(reg.mustBeInitialized(), reg.getMayWriters());
+                final Expression registerValue = state.computeIfAbsent(registerState, k -> {
+                    assert k.initialized || !k.writers.isEmpty();
+                    Formula value = k.initialized ? context.result(k.writers.get(0)).formula()
+                            : !initializeRegisters ? exprEncoder.encodeAt(register, reader).formula()
+                            : exprEncoder.encodeFinal(exprs.makeGeneralZero(register.getType())).formula();
+                    for (RegWriter writer : k.initialized ? k.writers.subList(1, k.writers.size()) : k.writers) {
+                        value = bmgr.ifThenElse(context.execution(writer), context.result(writer).formula(), value);
+                    }
+                    return new TypedFormula<>(register.getType(), value);
+                });
+                enc.add(exprEncoder.assignEqualAt(register, reader, registerValue, reader));
             }
         }
 
-        enc.addAll(computeRegReaderEqualities());
+        //enc.addAll(computeRegReaderEqualities());
 
         return bmgr.and(enc);
     }
