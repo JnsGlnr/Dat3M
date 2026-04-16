@@ -515,7 +515,7 @@ public class ProgramEncoder {
                 // Encode that the value equals the result of the latest executed writer.
                 final var registerState = new RegisterState(reg.mustBeInitialized(), reg.getMayWriters());
                 final Expression registerValue = state.computeIfAbsent(registerState, k -> {
-                    assert k.initialized || !k.writers.isEmpty();
+                    assert !k.initialized || !k.writers.isEmpty();
                     Formula value = k.initialized ? context.result(k.writers.get(0)).formula()
                             : !initializeRegisters ? exprEncoder.encodeAt(register, reader).formula()
                             : exprEncoder.encodeFinal(exprs.makeGeneralZero(register.getType())).formula();
