@@ -107,6 +107,12 @@ test,vulkan_pvmm,vulkan_chains_union,vulkan_chains_new,vulkan_pvmm_new,vulkan_pv
 ,,,,,,,,
 x-sb,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 x-sb-fence,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+x-sb-barrier-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+x-sb-barrier-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+x-sb-barrier-c,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+x-sb-barrier-d,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+x-sb-barrier-e,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+x-sb-barrier-f,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,,
 x-avvis-mp-bad-fence,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 x-avvis-mp-bad-fence-acqrel,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS

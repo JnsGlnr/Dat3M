@@ -5,7 +5,5 @@ Vulkan
  membar.acq_rel.dv.semsc0.semav.semvis  | membar.acq_rel.dv.semsc0.semav.semvis  ;
  membar.acq_rel.dv.semsc0.semav.semvis  | membar.acq_rel.dv.semsc0.semav.semvis  ;
  ld.atom.acq.dv.sc0.semsc0.semvis r0, y | ld.atom.acq.dv.sc0.semsc0.semvis r0, x ;
-filter
-(P0:r0 == 0 /\ P1:r0 == 0)
 exists
 (P0:r0 == 0 /\ P1:r0 == 0)
