@@ -158,6 +158,7 @@ let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
               (ithb23 & ((SC2 * SC3) | (SC3 * SC2)))
 
 let locord = loc & (
+    (IW * (M \ IW)) |
     ([R]; ssw+; [R | W]) |
     ([W]; schb; [AVDEVICE]; hbsc; [W]) |
     ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]) |
@@ -174,11 +175,10 @@ let locord = loc & (
 (***********************)
 
 // locord, rf, fr, asmo must not form cycles
-let sfr = rf^-1; (asmo | (loc & (IW * (W \ IW))))
-acyclic (locord | rf | sfr | asmo) as consistency-cycle
+acyclic (locord | (mutordatom & (rf | fr | co))) as consistency-cycle
 
 // load cannot read-from a value that is shadowed by another write
-empty rf & ([W]; locord; ([W]; locord)+) as consistency-rf
+empty rf & ([W]; (locord | asmo); ([W]; (locord | asmo))+) as consistency-rf
 
 // rmw events are atomic
 empty rmw & ((fr & ext); (co & ext)) as atomic
@@ -192,16 +192,10 @@ empty ((W * W) & locord) \ co as consistent-co
 
 let pair_with_write = ((W * W) | (W * R) | (R * W)) \ ((IW * _) | (_ * IW)) // ignore IW
 let ord-ww = (((W * W) & locord) | asmo)+
-let ord-wr = ord-ww? ; (locord & (W * R))
+let ord-wr = ord-ww? ; ((locord & (W * R)) | (rf & mutordatom))
 let race-ww = (loc & (W * W) & pair_with_write) \ id \ mutordatom \ ord-ww \ (ord-ww^-1)
 let race-wr = (loc & (W * R) & pair_with_write) \ mutordatom \ ord-wr \ locord^-1
 let race-rw = (loc & (R * W) & pair_with_write) \ mutordatom \ locord \ (ord-wr^-1)
-
-/*
-let pair_with_write = ((W * W) | (W * R) | (R * W)) \ ((IW * _) | (_ * IW)) // ignore IW
-let dr = loc & (pair_with_write \ mutordatom \ id \ (locord | locord^-1))
-flag ~empty dr as racy
-*/
 
 let dr = race-ww | race-wr | race-rw
 flag ~empty dr as racy

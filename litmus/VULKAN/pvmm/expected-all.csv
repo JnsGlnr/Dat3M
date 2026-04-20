@@ -31,9 +31,9 @@ test,vulkan_pvmm,vulkan_chains_union,vulkan_chains_new,vulkan_pvmm_new2,vulkan_p
 3-problem-race-asmo,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 3-problem-race-asmo-alt,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,
-3-new-race-wrr-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS
-3-new-race-wrr-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS
-3-new-race-wrr-c,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS
+3-new-race-wrr-a,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS
+3-new-race-wrr-b,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS
+3-new-race-wrr-c,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS
 3-new-race-wrr-d,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 3-new-race-wrw-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 3-new-race-wrw-b,PASS,PASS,PASS,PASS,PASS,PASS,PASS
@@ -58,10 +58,10 @@ test,vulkan_pvmm,vulkan_chains_union,vulkan_chains_new,vulkan_pvmm_new2,vulkan_p
 ,,,,,,,
 4-ssw-sync-r-w,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 ,,,,,,,
-4-ssw-sync-wr-r-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS
-4-ssw-sync-wr-r-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS
-4-ssw-sync-wr-r-c,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS
-4-ssw-sync-wr-r-d,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS
+4-ssw-sync-wr-r-a,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS
+4-ssw-sync-wr-r-b,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS
+4-ssw-sync-wr-r-c,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS
+4-ssw-sync-wr-r-d,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS
 4-ssw-sync-wr-r-e,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,
 4-ssw-sync-wr-w-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS
@@ -143,7 +143,7 @@ x-avvis-mp-good-fence-scope-avvis,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 x-avvis-mp-good-scope-avvis,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,
 x-locord-rr-cycle,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
-x-locord-rr-visibility,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,PASS
+x-locord-rr-visibility,FAIL,FAIL,FAIL,FAIL,PASS,FAIL,PASS
 ,,,,,,,
 extra-mp3-fence-order-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 extra-mp3-fence-order-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
