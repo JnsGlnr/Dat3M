@@ -40,7 +40,6 @@ public class EnumerationSolver extends ModelChecker {
 
     protected Context preprocessAndAnalyse(VerificationTask task) throws InvalidConfigurationException {
         final Configuration config = task.getConfig();
-        task.getMemoryModel().configureAll(config);
         preprocessProgram(task, config);
         preprocessMemoryModel(task, config);
 
@@ -67,20 +66,15 @@ public class EnumerationSolver extends ModelChecker {
         ProgramEncoder programEncoder = ProgramEncoder.withContext(context);
         WmmEncoder wmmEncoder = WmmEncoder.withContext(context);
         SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
-        PropertyEncoder propertyEncoder = PropertyEncoder.withContext(context);
 
         logger.info("Starting encoding using {}", solverContext.getVersion());
         prover.writeComment("Program encoding");
         prover.addConstraint(programEncoder.encodeFullProgram());
         prover.writeComment("Memory model encoding");
         prover.addConstraint(wmmEncoder.encodeFullMemoryModel());
-        // For validation this contains information.
-        // For verification graph.encode() just returns ctx.mkTrue()
-        prover.writeComment("Witness encoding");
-        prover.addConstraint(task.getWitness().encode(context));
         prover.writeComment("Symmetry breaking encoding");
         prover.addConstraint(symmetryEncoder.encodeFullSymmetryBreaking());
-        prover.addConstraint(propertyEncoder.encodeLastCoConstraints());
+        prover.addConstraint(wmmEncoder.encodeLastCoConstraints());
 
         checkForInterrupts();
 
@@ -89,7 +83,7 @@ public class EnumerationSolver extends ModelChecker {
         final ExpressionEncoder expressionEncoder = context.getExpressionEncoder();
         final ExpressionFactory exprs = context.getExpressionFactory();
 
-        // ======= Collect relevant expressions from litmus test spec
+        // ======= Collect relevant expressions from litmus test spec ========
         final Set<Expression> __finalStateExprs = new HashSet<>();
         task.getProgram().getSpecification().accept(new ExpressionInspector() {
             @Override
@@ -106,12 +100,14 @@ public class EnumerationSolver extends ModelChecker {
         });
         final List<Expression> finalStateExprs = new ArrayList<>(__finalStateExprs);
         finalStateExprs.sort(this::compareExpr);
-        // ======================================================
+        // =============================================================
 
-        // ======= Enumerate states =======
+        // ===================== Enumerate states =====================
+        logger.info("Starting state space enumeration");
+        final int MAX_ENUMERATED_STATES = 10000;
         final List<Map<Expression, Expression>> visitedStates = new ArrayList<>();
         while (!prover.isUnsat()) {
-            if (visitedStates.size() > 10000) {
+            if (visitedStates.size() > MAX_ENUMERATED_STATES) {
                 System.out.println("Too many states, stopping enumeration");
                 break;
             }
@@ -128,9 +124,11 @@ public class EnumerationSolver extends ModelChecker {
                 }
 
                 visitedStates.add(state);
+                // Block state
                 prover.addConstraint(bmgr.not(bmgr.and(stateCube)));
             }
         }
+        // // ======================================================
 
         res = UNKNOWN;
         printStates(finalStateExprs, visitedStates);
