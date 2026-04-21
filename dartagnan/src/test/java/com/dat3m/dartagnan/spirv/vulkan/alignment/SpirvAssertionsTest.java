@@ -89,7 +89,7 @@ public class SpirvAssertionsTest {
         Wmm mcm = new ParserCat().parse(new File(modelPath));
         addVulkanPartialCoConstraints(mcm);
         VerificationTask task = builder.build(program, mcm, EnumSet.of(PROGRAM_SPEC));
-        assertEquals(expected, TestHelper.createAndRunModelChecker(task, Method.EAGER));
+        assertEquals(expected, TestHelper.createAndRunSolver(task, Method.EAGER));
         Arch.forcePartialCo = false;
     }
 

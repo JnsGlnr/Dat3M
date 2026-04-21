@@ -358,7 +358,7 @@ public class SpirvRacesTest {
         Wmm mcm = new ParserCat().parse(new File(modelPath));
         addVulkanPartialCoConstraints(mcm);
         VerificationTask task = builder.build(program, mcm, EnumSet.of(CAT_SPEC));
-        assertEquals(expected, TestHelper.createAndRunModelChecker(task, Method.EAGER));
+        assertEquals(expected, TestHelper.createAndRunSolver(task, Method.EAGER));
         Arch.forcePartialCo = false;
     }
 

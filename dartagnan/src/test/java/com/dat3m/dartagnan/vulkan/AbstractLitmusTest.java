@@ -11,7 +11,9 @@ import com.dat3m.dartagnan.utils.rules.Provider;
 import com.dat3m.dartagnan.utils.rules.Providers;
 import com.dat3m.dartagnan.utils.rules.RequestShutdownOnError;
 import com.dat3m.dartagnan.verification.VerificationTask;
+import com.dat3m.dartagnan.verification.solving.AssumeSolver;
 import com.dat3m.dartagnan.verification.solving.ModelChecker;
+import com.dat3m.dartagnan.verification.solving.RefinementSolver;
 import com.dat3m.dartagnan.wmm.Wmm;
 import org.junit.Rule;
 import org.junit.Test;
@@ -147,7 +149,7 @@ public abstract class AbstractLitmusTest {
 
     @Test
     public void testAssume() throws Exception {
-        try (ModelChecker checker = ModelChecker.create(taskProvider.get(), Method.EAGER)) {
+        try (ModelChecker checker = AssumeSolver.create(taskProvider.get())) {
             checker.setShutdownManager(shutdownManagerProvider.get());
             checker.run();
             assertEquals(expected, checker.getResult());
@@ -156,7 +158,7 @@ public abstract class AbstractLitmusTest {
 
     @Test
     public void testRefinement() throws Exception {
-        try (ModelChecker checker = ModelChecker.create(taskProvider.get(), Method.LAZY)) {
+        try (ModelChecker checker = RefinementSolver.create(taskProvider.get())) {
             checker.setShutdownManager(shutdownManagerProvider.get());
             checker.run();
             assertEquals(expected, checker.getResult());
@@ -168,7 +170,7 @@ public abstract class AbstractLitmusTest {
         Arch.forcePartialCo = true;
         VerificationTask task = taskProvider.get();
         addVulkanPartialCoConstraints(task.getMemoryModel());
-        try (ModelChecker checker = ModelChecker.create(task, Method.EAGER)) {
+        try (ModelChecker checker = AssumeSolver.create(task)) {
             checker.setShutdownManager(shutdownManagerProvider.get());
             checker.run();
             assertEquals(expected, checker.getResult());
@@ -181,7 +183,7 @@ public abstract class AbstractLitmusTest {
         Arch.forcePartialCo = true;
         VerificationTask task = taskProvider.get();
         addVulkanPartialCoConstraints(task.getMemoryModel());
-        try (ModelChecker checker = ModelChecker.create(task, Method.LAZY)) {
+        try (ModelChecker checker = RefinementSolver.create(task)) {
             checker.setShutdownManager(shutdownManagerProvider.get());
             checker.run();
             assertEquals(expected, checker.getResult());

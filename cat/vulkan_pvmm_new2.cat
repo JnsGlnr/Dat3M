@@ -179,7 +179,7 @@ acyclic (locord | (mutordatom & (co | rf | fr))) as consistency-cycle
 
 // load cannot read-from a value that is shadowed by another write
 empty rf & ([W]; (locord | asmo); ([W]; (locord | asmo))+) as consistency-rf
-irreflexive locord; (co | rf | fr)
+irreflexive locord; (co | rf | fr) as irreflexive-locord
 
 // rmw events are atomic
 empty rmw & ((fr & ext); (co & ext)) as atomic

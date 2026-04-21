@@ -12,7 +12,9 @@ import com.dat3m.dartagnan.program.event.core.GenericVisibleEvent;
 import com.dat3m.dartagnan.utils.Result;
 import com.dat3m.dartagnan.utils.printer.Printer;
 import com.dat3m.dartagnan.verification.VerificationTask;
+import com.dat3m.dartagnan.verification.solving.AssumeSolver;
 import com.dat3m.dartagnan.verification.solving.ModelChecker;
+import com.dat3m.dartagnan.verification.solving.RefinementSolver;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.Wmm;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
@@ -114,14 +116,14 @@ public class PvmmTest {
                     Program program = new ProgramParser().parse(new File(programPath));
                     Wmm mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(model));
                     VerificationTask taskEager = mkTask(program, mcm, CAT_SPEC);
-                    try (ModelChecker mc = ModelChecker.create(taskEager, Method.EAGER)) {
+                    try (ModelChecker mc = AssumeSolver.create(taskEager)) {
                         mc.run();
                         assertEquals(result, mc.getResult());
                     }
                     program = new ProgramParser().parse(new File(programPath));
                     mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(model));
                     VerificationTask taskLazy = mkTask(program, mcm, CAT_SPEC);
-                    try (ModelChecker mc = ModelChecker.create(taskLazy, Method.LAZY)) {
+                    try (ModelChecker mc = RefinementSolver.create(taskLazy)) {
                         mc.run();
                         assertEquals(result, mc.getResult());
                     }
@@ -144,14 +146,14 @@ public class PvmmTest {
                     Program program = new ProgramParser().parse(new File(programPath));
                     Wmm mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(model));
                     VerificationTask taskEager = mkTask(program, mcm, PROGRAM_SPEC);
-                    try (ModelChecker mc = ModelChecker.create(taskEager, Method.EAGER)) {
+                    try (ModelChecker mc = AssumeSolver.create(taskEager)) {
                         mc.run();
                         assertEquals(result, mc.getResult());
                     }
                     program = new ProgramParser().parse(new File(programPath));
                     mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(model));
                     VerificationTask taskLazy = mkTask(program, mcm, PROGRAM_SPEC);
-                    try (ModelChecker mc = ModelChecker.create(taskLazy, Method.LAZY)) {
+                    try (ModelChecker mc = RefinementSolver.create(taskLazy)) {
                         mc.run();
                         assertEquals(result, mc.getResult());
                     }
@@ -169,6 +171,7 @@ public class PvmmTest {
                 for (Map.Entry<String, Result> resultEntry : programEntry.getValue().entrySet()) {
                     Result result = resultEntry.getValue();
                     String modelPath = getRootPath("cat/" + resultEntry.getKey() + ".cat");
+                    System.out.println(modelPath);
                     Program program = new ProgramParser().parse(new File(programPath));
                     Wmm mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(modelPath));
                     Property property = PROGRAM_SPEC;
@@ -186,11 +189,15 @@ public class PvmmTest {
                         if (axiomCo != null) {
                             mcm.addConstraint(new Emptiness(axiomCo.getRelation(), true, true));
                         }
+                        Axiom irreflexiveLocord = removeAxiom(mcm, "irreflexive-locord");
+                        if (irreflexiveLocord != null) {
+                            mcm.addConstraint(new Emptiness(irreflexiveLocord.getRelation(), true, true));
+                        }
                         program.setFilterSpecification(program.getSpecification());
                         property = CAT_SPEC;
                     }
                     VerificationTask task = mkTask(program, mcm, property);
-                    try (ModelChecker mc = ModelChecker.create(task, Method.EAGER)) {
+                    try (ModelChecker mc = AssumeSolver.create(task)) {
                         mc.run();
                         assertTrue(mc.hasModel());
                         RelationAnalysis ra = mc.getEncodingContext().getAnalysisContext().get(RelationAnalysis.class);
@@ -213,6 +220,7 @@ public class PvmmTest {
                 for (Map.Entry<String, Result> resultEntry : programEntry.getValue().entrySet()) {
                     Result result = resultEntry.getValue() == PASS ? FAIL : PASS;
                     String modelPath = getRootPath("cat/" + resultEntry.getKey() + ".cat");
+                    System.out.println(modelPath);
                     Program program = new ProgramParser().parse(new File(programPath));
                     Wmm mcm = new ParserCat(libs.get(typeEntry.getKey())).parse(new File(modelPath));
                     Property property = CAT_SPEC;
@@ -221,7 +229,7 @@ public class PvmmTest {
                         program.setSpecification(Program.SpecificationType.EXISTS, program.getFilterSpecification());
                     }
                     VerificationTask task = mkTask(program, mcm, property);
-                    try (ModelChecker mc = ModelChecker.create(task, Method.EAGER)) {
+                    try (ModelChecker mc = AssumeSolver.create(task)) {
                         mc.run();
                         assertTrue(mc.hasModel());
                         RelationAnalysis ra = mc.getEncodingContext().getAnalysisContext().get(RelationAnalysis.class);
