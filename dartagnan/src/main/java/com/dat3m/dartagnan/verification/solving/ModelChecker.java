@@ -12,6 +12,7 @@ import com.dat3m.dartagnan.program.analysis.ExecutionAnalysis;
 import com.dat3m.dartagnan.program.analysis.ReachingDefinitionsAnalysis;
 import com.dat3m.dartagnan.program.analysis.ThreadSymmetry;
 import com.dat3m.dartagnan.program.analysis.alias.AliasAnalysis;
+import com.dat3m.dartagnan.program.analysis.interval.IntervalAnalysis;
 import com.dat3m.dartagnan.program.event.Event;
 import com.dat3m.dartagnan.program.processing.ProcessingManager;
 import com.dat3m.dartagnan.smt.ProverWithTracker;
@@ -25,6 +26,7 @@ import com.dat3m.dartagnan.wmm.Wmm;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.analysis.WmmAnalysis;
 import com.dat3m.dartagnan.wmm.processing.WmmProcessingManager;
+
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,11 +44,10 @@ import static com.dat3m.dartagnan.smt.SMTHelper.createSolverContext;
 import static com.dat3m.dartagnan.utils.Result.*;
 
 // Base class for SMT-based model checkers
-@Options
 public abstract class ModelChecker implements AutoCloseable {
 
     @Options
-    protected static class SMTConfig {
+    public static class SMTConfig {
         @Option(
                 name = SOLVER,
                 description = "Uses the specified SMT solver as a backend.",
@@ -65,21 +66,6 @@ public abstract class ModelChecker implements AutoCloseable {
         public boolean getDumpSmtLib() {
             return smtlib;
         }
-
-        @Option(
-                name = TIMEOUT,
-                description = "Timeout before interrupting the SMT solver. Can specify time units ns, ms, s (default), min, and h.")
-        @TimeSpanOption(min = 0, codeUnit = TimeUnit.MILLISECONDS, defaultUserUnit = TimeUnit.SECONDS)
-        private int timeout = 0;
-
-
-        public boolean hasTimeout() {
-            return timeout > 0;
-        }
-
-        public int getTimeout() {
-            return timeout;
-        }
     }
 
     private static final Logger logger = LoggerFactory.getLogger(ModelChecker.class);
@@ -97,6 +83,7 @@ public abstract class ModelChecker implements AutoCloseable {
     protected ModelChecker(VerificationTask task) throws InvalidConfigurationException {
         this.task = Preconditions.checkNotNull(task);
         this.smtConfig = new SMTConfig();
+
         task.getConfig().inject(smtConfig);
     }
 
@@ -105,19 +92,16 @@ public abstract class ModelChecker implements AutoCloseable {
         return res;
     }
 
-    public long getTimeout() {
-        return smtConfig.getTimeout();
-    }
-
     public void setShutdownManager(ShutdownManager shutdownManager) {
+        Preconditions.checkNotNull(shutdownManager);
         this.shutdownManager = shutdownManager;
     }
 
     public boolean hasModel() {
         final Property.Type propType = Property.getCombinedType(context.getTask().getProperty(), context.getTask());
         final boolean hasViolationWitnesses = res == FAIL && propType == Property.Type.SAFETY;
-        final boolean hasPositiveWitnesses = res == PASS && propType == Property.Type.REACHABILITY;
-        final boolean hasReachedBounds = res == UNKNOWN && propType == Property.Type.SAFETY;
+        final boolean hasPositiveWitnesses  = res == PASS && propType == Property.Type.REACHABILITY;
+        final boolean hasReachedBounds      = res == UNKNOWN && propType == Property.Type.SAFETY;
         return (hasViolationWitnesses || hasPositiveWitnesses || hasReachedBounds);
     }
 
@@ -126,38 +110,16 @@ public abstract class ModelChecker implements AutoCloseable {
         return context.newEvaluator(prover);
     }
 
-    public ExecutionModelNext getExecutionGraph() throws SolverException {
-        Preconditions.checkState(hasModel(), "No model available");
-        try (IREvaluator evaluator = getModel()) {
-            return new ExecutionModelManager().buildExecutionModel(evaluator);
-        }
-    }
-
     protected abstract void runInternal() throws InterruptedException, SolverException, InvalidConfigurationException;
 
     public void run() throws SolverException, InterruptedException, InvalidConfigurationException {
         Preconditions.checkState(prover == null, "Model checker already ran.");
-        if (!smtConfig.hasTimeout()) {
-            runInternal();
-            return;
-        }
-
-        java.lang.Thread t = new java.lang.Thread(() -> {
-            try {
-                final long timeoutInMillis = smtConfig.getTimeout();
-                java.lang.Thread.sleep(timeoutInMillis);
-                final String error = String.format("Timeout of %s exceeded.", Utils.toTimeString(timeoutInMillis));
-                shutdownManager.requestShutdown(error);
-            } catch (InterruptedException e) {
-                // Verification ended, nothing to be done.
-            }
-        });
-
-        t.start();
         runInternal();
-        t.interrupt();
-
         checkForInterrupts();
+    }
+
+    public void requestShutdown(String reason) {
+        shutdownManager.requestShutdown(reason);
     }
 
     protected void checkForInterrupts() throws InterruptedException {
@@ -240,18 +202,7 @@ public abstract class ModelChecker implements AutoCloseable {
         analysisContext.register(RelationAnalysis.class, RelationAnalysis.fromConfig(task, analysisContext, config));
     }
 
-    // ====================================== Processing utility ==================================================
-
-    public static ModelChecker create(VerificationTask task, Method method) throws InvalidConfigurationException {
-        if (task.getProperty().contains(DATARACEFREEDOM) && method != Method.EAGER) {
-            // For DATARACEFREEDOM, we always use EAGER
-            logger.warn("Method {} is not supported for property {}. Using EAGER instead.", method, DATARACEFREEDOM);
-            method = Method.EAGER;
-        }
-        return switch (method) {
-            case EAGER -> AssumeSolver.create(task);
-            case LAZY -> RefinementSolver.create(task);
-            case EXPLORE -> EnumerationSolver.create(task);
-        };
+    public static void performIntervalAnalysis(VerificationTask task, Context analysisContext, Configuration config) throws InvalidConfigurationException {
+        analysisContext.registerOptional(IntervalAnalysis.class, IntervalAnalysis.fromConfig(task.getProgram(), analysisContext, task.getMemoryModel(), config));
     }
 }

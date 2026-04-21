@@ -5,10 +5,7 @@ import com.dat3m.dartagnan.program.Register;
 import com.dat3m.dartagnan.program.event.Event;
 import com.dat3m.dartagnan.program.event.EventFactory;
 import com.dat3m.dartagnan.program.event.Tag;
-import com.dat3m.dartagnan.program.event.arch.opencl.OpenCLRMWExtremum;
 import com.dat3m.dartagnan.program.event.core.*;
-import com.dat3m.dartagnan.program.event.lang.catomic.AtomicFetchOp;
-import com.dat3m.dartagnan.program.event.lang.catomic.AtomicXchg;
 import com.dat3m.dartagnan.program.event.lang.spirv.*;
 
 import java.util.HashSet;
@@ -56,21 +53,21 @@ public class VisitorSpirvOpenCL extends VisitorC11 {
     @Override
     public List<Event> visitSpirvXchg(SpirvXchg e) {
         String mo = moToOpenCLTag(Tag.Spirv.getMoTag(e.getTags()));
-        AtomicXchg rmw = Atomic.newExchange(e.getResultRegister(), e.getAddress(),
+        Event rmw = Atomic.newExchange(e.getResultRegister(), e.getAddress(),
                 e.getValue(), mo);
         rmw.addTags(toOpenCLTags(e.getTags()));
         rmw.setFunction(e.getFunction());
-        return visitAtomicXchg(rmw);
+        return rmw.accept(this);
     }
 
     @Override
     public List<Event> visitSpirvRMW(SpirvRmw e) {
         String mo = moToOpenCLTag(Tag.Spirv.getMoTag(e.getTags()));
-        AtomicFetchOp rmwOp = Atomic.newFetchOp(e.getResultRegister(), e.getAddress(),
+        Event rmwOp = Atomic.newFetchOp(e.getResultRegister(), e.getAddress(),
                 e.getOperand(), e.getOperator(), mo);
         rmwOp.setFunction(e.getFunction());
         rmwOp.addTags(toOpenCLTags(e.getTags()));
-        return visitAtomicFetchOp(rmwOp);
+        return rmwOp.accept(this);
     }
 
     @Override
@@ -111,16 +108,6 @@ public class VisitorSpirvOpenCL extends VisitorC11 {
                 store,
                 casEnd
         ));
-    }
-
-    @Override
-    public List<Event> visitSpirvRmwExtremum(SpirvRmwExtremum e) {
-        String mo = moToOpenCLTag(Tag.Spirv.getMoTag(e.getTags()));
-        OpenCLRMWExtremum rmw = Atomic.newRMWExtremum(e.getResultRegister(), e.getAddress(),
-                e.getOperator(), e.getValue(), mo);
-        rmw.setFunction(e.getFunction());
-        rmw.addTags(toOpenCLTags(e.getTags()));
-        return visitOpenCLRMWExtremum(rmw);
     }
 
     @Override

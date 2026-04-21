@@ -5,7 +5,6 @@ import com.dat3m.dartagnan.expression.Expression;
 import com.dat3m.dartagnan.expression.ExpressionFactory;
 import com.dat3m.dartagnan.expression.Type;
 import com.dat3m.dartagnan.expression.integers.IntBinaryOp;
-import com.dat3m.dartagnan.expression.integers.IntCmpOp;
 import com.dat3m.dartagnan.expression.type.IntegerType;
 import com.dat3m.dartagnan.parsers.SpirvBaseVisitor;
 import com.dat3m.dartagnan.parsers.SpirvParser;
@@ -13,7 +12,6 @@ import com.dat3m.dartagnan.parsers.program.visitors.spirv.helpers.HelperTags;
 import com.dat3m.dartagnan.parsers.program.visitors.spirv.builders.ProgramBuilder;
 import com.dat3m.dartagnan.program.Register;
 import com.dat3m.dartagnan.program.event.Event;
-import com.dat3m.dartagnan.program.event.lang.spirv.*;
 
 import java.util.Set;
 
@@ -34,8 +32,7 @@ public class VisitorOpsAtomic extends SpirvBaseVisitor<Event> {
         String scope = getScopeTag(ctx.memory().getText());
         Set<String> tags = getMemorySemanticsTags(ctx.semantics().getText());
         tags.add(builder.getPointerStorageClass(ctx.pointer().getText()));
-        SpirvLoad event = newSpirvLoad(register, ptr, scope, tags);
-        return builder.addEvent(event);
+        return builder.addEvent(newLoad(register, ptr, scope, tags));
     }
 
     @Override
@@ -45,8 +42,7 @@ public class VisitorOpsAtomic extends SpirvBaseVisitor<Event> {
         String scope = getScopeTag(ctx.memory().getText());
         Set<String> tags = getMemorySemanticsTags(ctx.semantics().getText());
         tags.add(builder.getPointerStorageClass(ctx.pointer().getText()));
-        SpirvStore event = newSpirvStore(ptr, value, scope, tags);
-        return builder.addEvent(event);
+        return builder.addEvent(newStore(ptr, value, scope, tags));
     }
 
     @Override
@@ -57,8 +53,7 @@ public class VisitorOpsAtomic extends SpirvBaseVisitor<Event> {
         String scope = getScopeTag(ctx.memory().getText());
         Set<String> tags = getMemorySemanticsTags(ctx.semantics().getText());
         tags.add(builder.getPointerStorageClass(ctx.pointer().getText()));
-        SpirvXchg event = newSpirvXchg(register, ptr, value, scope, tags);
-        return builder.addEvent(event);
+        return builder.addEvent(newXchg(register, ptr, value, scope, tags));
     }
 
     @Override
@@ -118,37 +113,26 @@ public class VisitorOpsAtomic extends SpirvBaseVisitor<Event> {
 
     @Override
     public Event visitOpAtomicSMax(SpirvParser.OpAtomicSMaxContext ctx) {
-        return visitOpAtomicExtremum(ctx.idResult(), ctx.idResultType(), ctx.pointer(),
-                ctx.memory(), ctx.semantics(), ctx.valueIdRef(), IntCmpOp.GT);
+        return visitAtomicOp(ctx.idResult(), ctx.idResultType(), ctx.pointer(),
+                ctx.memory(), ctx.semantics(), ctx.valueIdRef(), IntBinaryOp.SMAX);
     }
 
     @Override
     public Event visitOpAtomicSMin(SpirvParser.OpAtomicSMinContext ctx) {
-        return visitOpAtomicExtremum(ctx.idResult(), ctx.idResultType(), ctx.pointer(),
-                ctx.memory(), ctx.semantics(), ctx.valueIdRef(), IntCmpOp.LT);
+        return visitAtomicOp(ctx.idResult(), ctx.idResultType(), ctx.pointer(),
+                ctx.memory(), ctx.semantics(), ctx.valueIdRef(), IntBinaryOp.SMIN);
     }
 
-    private Event visitOpAtomicExtremum(
-            SpirvParser.IdResultContext idCtx,
-            SpirvParser.IdResultTypeContext typeCtx,
-            SpirvParser.PointerContext ptrCtx,
-            SpirvParser.MemoryContext scopeCtx,
-            SpirvParser.SemanticsContext tagsCtx,
-            SpirvParser.ValueIdRefContext valCtx,
-            IntCmpOp kind
-    ) {
-        Register register = builder.addRegister(idCtx.getText(), typeCtx.getText());
-        Expression ptr = builder.getExpression(ptrCtx.getText());
-        Expression value = builder.getExpression(valCtx.getText());
-        String scope = getScopeTag(scopeCtx.getText());
-        Set<String> tags = getMemorySemanticsTags(tagsCtx.getText());
-        tags.add(builder.getPointerStorageClass(ptrCtx.getText()));
-        if (!(ptr.getType() instanceof IntegerType) || !(value.getType() instanceof IntegerType)) {
-            throw new ParsingException("Unexpected type at '%s' or '%s', expected integer but received '%s' and '%s'",
-                    ptrCtx.getText(), valCtx.getText(), ptr.getType(), value.getType());
-        }
-        SpirvRmwExtremum event = newSpirvRmwExtremum(register, ptr, kind, value, scope, tags);
-        return builder.addEvent(event);
+    @Override
+    public Event visitOpAtomicUMax(SpirvParser.OpAtomicUMaxContext ctx) {
+        return visitAtomicOp(ctx.idResult(), ctx.idResultType(), ctx.pointer(),
+                ctx.memory(), ctx.semantics(), ctx.valueIdRef(), IntBinaryOp.UMAX);
+    }
+
+    @Override
+    public Event visitOpAtomicUMin(SpirvParser.OpAtomicUMinContext ctx) {
+        return visitAtomicOp(ctx.idResult(), ctx.idResultType(), ctx.pointer(),
+                ctx.memory(), ctx.semantics(), ctx.valueIdRef(), IntBinaryOp.UMIN);
     }
 
     private Event visitOpAtomicCompareExchange(
@@ -172,8 +156,7 @@ public class VisitorOpsAtomic extends SpirvBaseVisitor<Event> {
         neqTags.add(builder.getPointerStorageClass(ptrCtx.getText()));
         Expression value = builder.getExpression(valCtx.getText());
         Expression cmp = builder.getExpression(cmpCtx.getText());
-        SpirvCmpXchg event = newSpirvCmpXchg(register, ptr, cmp, value, scope, eqTags, neqTags);
-        return builder.addEvent(event);
+        return builder.addEvent(newCmpXchg(register, ptr, cmp, value, scope, eqTags, neqTags));
     }
 
     private Event visitAtomicOpIncDec(
@@ -220,8 +203,7 @@ public class VisitorOpsAtomic extends SpirvBaseVisitor<Event> {
         String scope = getScopeTag(scopeCtx.getText());
         Set<String> tags = getMemorySemanticsTags(tagsCtx.getText());
         tags.add(builder.getPointerStorageClass(ptrCtx.getText()));
-        SpirvRmw event = newSpirvRmw(register, ptr, op, value, scope, tags);
-        return builder.addEvent(event);
+        return builder.addEvent(newRmw(register, ptr, op, value, scope, tags));
     }
 
     private String getScopeTag(String scopeId) {

@@ -44,11 +44,15 @@ public class MiscellaneousTest extends AbstractCTest {
 
     @Override
     protected ConfigurationBuilder additionalConfig(ConfigurationBuilder builder) {
-        if (!name.equals("pthread") && !name.equals("ctlz") && !name.equals("cttz") && !name.equals("ffs") && !name.startsWith("floats")) {
+        if (!name.equals("pthread") && !name.equals("ctlz") && !name.equals("cttz") && !name.equals("ffs")
+                && !name.equals("memcpy_s") && !name.startsWith("floats")) {
             builder.setOption(OptionNames.USE_INTEGERS, "true");
         }
         if (name.equals("recursion")) {
             builder.setOption(OptionNames.RECURSION_BOUND, String.valueOf(bound));
+        }
+        if (name.equals("memcpy_s")) {
+            builder.setOption(OptionNames.MIXED_SIZE, "true");
         }
         return builder;
     }
@@ -100,7 +104,7 @@ public class MiscellaneousTest extends AbstractCTest {
                 {"zero-extension", IMM, PASS, 1},
                 {"floats_1", IMM, PASS, 1},
                 {"floats_2", IMM, PASS, 1},
-                // {"floats_3", IMM, PASS, 1}, // TODO we can enable this once we have proper support for bitcats, see #957
+                {"floats_3", IMM, PASS, 1},
                 {"floats_4", IMM, PASS, 1},
                 {"floats_5", IMM, PASS, 1},
                 {"floats_5_f", IMM, FAIL, 1},
@@ -114,16 +118,20 @@ public class MiscellaneousTest extends AbstractCTest {
                 {"floats_12", IMM, PASS, 1},
                 {"floats_13", IMM, PASS, 1},
                 {"floats_14", IMM, PASS, 1},
+                {"floats_15", IMM, PASS, 1},
+                {"floats_15_f", IMM, FAIL, 1},
+                {"floats_16", IMM, PASS, 1},
+                {"floats_16_f", IMM, FAIL, 1},
         });
     }
 
     @Test
     public void testAssume() throws Exception {
-        testModelChecker(Method.EAGER);
+        testSolver(Method.EAGER);
     }
 
     @Test
     public void testRefinement() throws Exception {
-        testModelChecker(Method.LAZY);
+        testSolver(Method.LAZY);
     }
 }

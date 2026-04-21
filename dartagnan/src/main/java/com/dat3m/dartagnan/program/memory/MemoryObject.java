@@ -48,12 +48,6 @@ public class MemoryObject extends LeafExpressionBase<Type> {
         this.allocationSite = allocationSite;
     }
 
-    public sealed interface ThreadLocalMode {}
-
-    public record ThreadLocal() implements ThreadLocalMode {}
-
-    public record PosixThreadLocal(MemoryObject destructor) implements ThreadLocalMode {}
-
     public boolean hasName() { return name != null; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -119,7 +113,8 @@ public class MemoryObject extends LeafExpressionBase<Type> {
             }
         } else if (value.getType() instanceof IntegerType
                 || value.getType() instanceof FloatType
-                || value.getType() instanceof BooleanType) {
+                || value.getType() instanceof BooleanType
+                || value.getType() instanceof MemoryType) {
             checkArgument(isInRange(offset), "array index out of bounds");
             initialValues.put(offset, value);
         } else {

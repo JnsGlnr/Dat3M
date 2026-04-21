@@ -1,9 +1,9 @@
 package com.dat3m.svcomp;
 
-import com.dat3m.dartagnan.parsers.witness.ParserWitness;
+import com.dat3m.dartagnan.Dartagnan;
 import com.dat3m.dartagnan.utils.options.BaseOptions;
-import com.dat3m.dartagnan.witness.graphml.WitnessGraph;
 import com.dat3m.dartagnan.configuration.Property;
+import com.dat3m.dartagnan.utils.ExitCode;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
@@ -22,7 +22,6 @@ import java.util.Set;
 import java.util.EnumSet;
 import java.util.stream.Collectors;
 
-import static com.dat3m.dartagnan.configuration.OptionInfo.collectOptions;
 import static com.dat3m.dartagnan.configuration.OptionNames.*;
 import static com.dat3m.dartagnan.utils.ExitCode.*;
 
@@ -53,11 +52,6 @@ public class SVCOMPRunner extends BaseOptions {
     }
 
     @Option(
-        name=VALIDATE,
-        description="Run Dartagnan as a violation witness validator. Argument is the path to the witness file.")
-    private String witnessPath;
-
-    @Option(
         name=NATIVE,
         description="Run Dartagnan in native mode rather than using the JVM.")
     private boolean nativeExecution = true;
@@ -68,7 +62,7 @@ public class SVCOMPRunner extends BaseOptions {
     public static void main(String[] args) throws Exception {
 
         if(Arrays.asList(args).contains("--help")) {
-            collectOptions();
+            Dartagnan.printOptions();
             return;
         }
 
@@ -97,17 +91,8 @@ public class SVCOMPRunner extends BaseOptions {
             return;
         }
 
-        WitnessGraph witness = new WitnessGraph(); 
-        if(r.witnessPath != null) {
-            witness = new ParserWitness().parse(new File(r.witnessPath));
-            if(!fileProgram.getName().equals(Paths.get(witness.getProgram()).getFileName().toString())) {
-                System.out.println("The witness was generated from a different program than " + fileProgram);
-                System.exit(WRONG_WITNESS_FILE.asInt());
-            }
-        }
-
-        String result = "UNKNOWN";
-        while(result.contains("UNKNOWN")) {
+        int exitCode = ExitCode.BOUNDED_RESULT.asInt();
+        while(exitCode == ExitCode.BOUNDED_RESULT.asInt()) {
             ArrayList<String> cmd = new ArrayList<>();
             if (r.nativeExecution) {
                 cmd.add(System.getenv().get("DAT3M_HOME") + "/dartagnan/target/dartagnan");
@@ -127,20 +112,23 @@ public class SVCOMPRunner extends BaseOptions {
             cmd.add("--bound.load=" + boundsFilePath);
             cmd.add("--bound.save=" + boundsFilePath);
             cmd.add(String.format("--%s=%s", PROPERTY, r.property.stream().map(Enum::name).collect(Collectors.joining(","))));
-            cmd.add(String.format("--%s=%s", WITNESS_ORIGINAL_PROGRAM_PATH, programPath));
             cmd.addAll(filterOptions(config));
 
             ProcessBuilder processBuilder = new ProcessBuilder(cmd);
             try {
                 Process proc = processBuilder.start();
                 BufferedReader read = new BufferedReader(new InputStreamReader(proc.getInputStream()));
-                proc.waitFor();
+                exitCode = proc.waitFor();
+                if (exitCode == ExitCode.UNKNOWN_ERROR.asInt()) {
+                    System.out.println("Unknown error in dartagnan");
+                    System.exit(0);
+                }
+                if (isExternalError(exitCode)) { // E.g., SMT solver crash
+                    System.out.println("Unknown external error");
+                    System.exit(0);
+                }
                 while(read.ready()) {
-                    String next = read.readLine();
-                    if(next.contains("Result:")) {
-                        result = next.substring(next.indexOf(' ') + 1);
-                    }
-                    System.out.println(next);
+                    System.out.println(read.readLine());
                 }
             } catch(Exception e) {
                 System.out.println(e.getMessage());
@@ -149,10 +137,15 @@ public class SVCOMPRunner extends BaseOptions {
         }
     }
     
+    private static boolean isExternalError(int exitCode) {
+        return Arrays.stream(ExitCode.values())
+                    .mapToInt(ExitCode::asInt)
+                    .noneMatch(code -> code == exitCode);
+    }
+
     private static List<String> filterOptions(Configuration config) {
-    	
         List<String> skip = Arrays.asList(PROPERTYPATH, NATIVE);
-    	
+
         return Arrays.stream(config.asPropertiesString().split("\n")).
             filter(p -> skip.stream().noneMatch(s -> s.equals(p.split(" = ")[0]))).
             map(p -> "--" + p.split(" = ")[0] + "=" + p.split(" = ")[1]).

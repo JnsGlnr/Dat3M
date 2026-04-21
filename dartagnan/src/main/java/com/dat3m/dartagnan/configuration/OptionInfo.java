@@ -1,75 +1,84 @@
 package com.dat3m.dartagnan.configuration;
 
-import com.google.common.reflect.ClassPath;
+import com.dat3m.dartagnan.Dartagnan;
+import com.dat3m.dartagnan.encoding.*;
+import com.dat3m.dartagnan.program.analysis.ReachingDefinitionsAnalysis;
+import com.dat3m.dartagnan.program.analysis.alias.AliasAnalysis;
+import com.dat3m.dartagnan.program.processing.*;
+import com.dat3m.dartagnan.program.processing.compilation.Compilation;
+import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreReasoner;
+import com.dat3m.dartagnan.utils.options.BaseOptions;
+import com.dat3m.dartagnan.utils.printer.Printer;
+import com.dat3m.dartagnan.verification.TaskSolver;
+import com.dat3m.dartagnan.verification.solving.ModelChecker;
+import com.dat3m.dartagnan.verification.solving.RefinementSolver;
+import com.dat3m.dartagnan.witness.graphviz.ExecutionGraphVisualizer;
+import com.dat3m.dartagnan.wmm.RelationNameRepository;
+import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
+import com.dat3m.dartagnan.wmm.analysis.WmmAnalysis;
+import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
+import com.dat3m.dartagnan.wmm.axiom.Emptiness;
+import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
+import com.dat3m.dartagnan.wmm.processing.WmmProcessingManager;
 import org.sosy_lab.common.configuration.Option;
 import org.sosy_lab.common.configuration.Options;
 
-import java.io.IOException;
-import java.lang.reflect.Method;
 import java.lang.reflect.*;
+import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Verify.verify;
 
-/**
- * Collects all {@link Option}s of a program.
- * <p>
- * Mimics {@link org.sosy_lab.common.configuration.OptionCollector OptionCollector} with reduced functionality.
- */
 public final class OptionInfo implements Comparable<OptionInfo> {
-
-    private static final Pattern PROJECT_CLASSES = Pattern.compile("^com\\.dat3m\\..*$");
-
-    /**
-     * Traverses all options from all classes and outputs them.
-     * Each find is printed to {@link System#out}.
-     */
-    public static void collectOptions() {
-
-        stream()
-                .sorted()
-                .forEach(System.out::print);
-    }
 
     public static Stream<OptionInfo> stream() {
         return classes().flatMap(OptionInfo::collectOptions);
     }
 
     private static Stream<Class<?>> classes() {
-        ClassPath classPath;
-        try {
-            classPath = ClassPath.from(OptionInfo.class.getClassLoader());
-        } catch (IOException e) {
-            return Stream.empty();
-        }
-
-        return classPath.getAllClasses().stream().flatMap(OptionInfo::load);
+        return Stream.of(
+                TaskSolver.class,
+                RelationNameRepository.class,
+                OptionNames.class,
+                Acyclicity.class,
+                Emptiness.class,
+                Irreflexivity.class,
+                Dartagnan.class,
+                ActiveSetAnalysis.class,
+                EncodingContext.class,
+                ProgramEncoder.class,
+                SymmetryEncoder.class,
+                WmmEncoder.class,
+                ReachingDefinitionsAnalysis.Config.class,
+                AliasAnalysis.Config.class,
+                BranchReordering.class,
+                Inlining.class,
+                Intrinsics.class,
+                LoopUnrolling.class,
+                MemoryAllocation.class,
+                NonterminationDetection.class,
+                ProcessingManager.class,
+                SparseConditionalConstantPropagation.class,
+                ThreadCreation.class,
+                Compilation.class,
+                CoreReasoner.class,
+                BaseOptions.class,
+                Printer.class,
+                ModelChecker.SMTConfig.class,
+                RefinementSolver.class,
+                RelationAnalysis.Config.class,
+                WmmAnalysis.class,
+                WmmProcessingManager.class,
+                ExecutionGraphVisualizer.class
+        );
     }
 
-    private static Stream<Class<?>> load(ClassPath.ClassInfo i) {
-        try {
-            return Stream.of(i.load());
-        } catch (LinkageError e) {
-            return Stream.empty();
-        }
-    }
-
-    /**
-     * This method collects every {@link Option} of a class.
-     *
-     * @param c class where to take the Option from
-     */
     private static Stream<OptionInfo> collectOptions(Class<?> c) {
 
         Options o = c.getAnnotation(Options.class);
         if (o == null) {
-            return Stream.empty();
-        }
-
-        if (!PROJECT_CLASSES.matcher(c.getCanonicalName()).matches()) {
             return Stream.empty();
         }
 
@@ -130,26 +139,6 @@ public final class OptionInfo implements Comparable<OptionInfo> {
 
     public Class<?> getDomain() {
         return domain;
-    }
-
-    public Stream<String> getAvailableValues() {
-        if (domain.isEnum()) {
-            return Stream.of(domain.getEnumConstants()).map(Object::toString);
-        }
-        if (domain.equals(Class.class)) {
-            verify(type instanceof ParameterizedType);
-            Type[] argument = ((ParameterizedType) type).getActualTypeArguments();
-            verify(argument.length == 1);
-            verify(argument[0] instanceof WildcardType);
-            WildcardType variable = (WildcardType) argument[0];
-            verify(variable.getLowerBounds().length == 0);
-            Type[] bound = variable.getUpperBounds();
-            verify(bound.length == 1);
-            verify(bound[0] instanceof Class);
-            Class<?> base = (Class<?>) bound[0];
-            return classes().filter(base::isAssignableFrom).filter(c -> !Modifier.isAbstract(c.getModifiers())).map(Class::getName);
-        }
-        return Stream.empty();
     }
 
     @Override
