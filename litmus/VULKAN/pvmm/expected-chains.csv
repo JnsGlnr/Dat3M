@@ -1,4 +1,4 @@
-test,vulkan_pvmm,vulkan_chains_union,vulkan_chains_new,vulkan_pvmm_new2,vulkan_pvmm_new2a,vulkan_pvmm_new3,vulkan_pvmm_new4
+test,vulkan_pvmm,vulkan_chains_union,vulkan_chains_new,vulkan_pvmm_new,vulkan_pvmm_new2,vulkan_pvmm_new3,vulkan_pvmm_new4
 ,,,,,,,
 2-f-graph-avvis-chains-semav-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 2-f-graph-avvis-chains-semav-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
