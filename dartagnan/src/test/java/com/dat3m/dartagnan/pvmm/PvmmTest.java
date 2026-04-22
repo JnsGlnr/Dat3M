@@ -1,7 +1,6 @@
 package com.dat3m.dartagnan.pvmm;
 
 import com.dat3m.dartagnan.configuration.Arch;
-import com.dat3m.dartagnan.configuration.Method;
 import com.dat3m.dartagnan.configuration.Property;
 import com.dat3m.dartagnan.parsers.cat.ParserCat;
 import com.dat3m.dartagnan.parsers.program.ProgramParser;
@@ -24,6 +23,8 @@ import com.dat3m.dartagnan.wmm.definition.Intersection;
 import com.dat3m.dartagnan.wmm.definition.TransitiveClosure;
 import com.dat3m.dartagnan.wmm.utils.graph.mutable.MapEventGraph;
 import com.dat3m.dartagnan.wmm.utils.graph.mutable.MutableEventGraph;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.sosy_lab.common.configuration.Configuration;
 import org.sosy_lab.java_smt.api.Model;
@@ -45,6 +46,16 @@ import static java.util.stream.Collectors.toMap;
 import static org.junit.Assert.*;
 
 public class PvmmTest {
+
+    @BeforeClass
+    public static void beforeAll() {
+        Arch.forcePartialCo = true;
+    }
+
+    @AfterClass
+    public static void afterAll() {
+        Arch.forcePartialCo = false;
+    }
 
     private static final Map<String, Path> libs = Map.of(
             "chains", Path.of(getRootPath("cat/chains")),

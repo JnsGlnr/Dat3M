@@ -184,6 +184,8 @@ empty rmw & ((fr & ext); (co & ext)) as atomic
 
 // coherence order cannot contradict locord
 empty ((W * W) & locord) \ co as consistent-co
+empty ((W * W) & mutordatom) \ (co | co^-1)
+empty ((IW * (W \ IW)) & vloc) \ co
 
 (***************)
 (* Data Races *)
