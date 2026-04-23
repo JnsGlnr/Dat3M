@@ -163,6 +163,11 @@ empty (rf; ([R \ ATOM])) & (([W]; locord); ([W]; locord)+) as consistency-rf
 // rmw events are atomic
 empty rmw & (fre; (asmo & ext)) as atomic
 
+// consistent coherence order
+empty ((W * W) & locord) \ id \ co as consistent-co
+empty ((W * W) & mutordatom) \ (co | co^-1)
+empty ((IW * (W \ IW)) & loc & vloc) \ co
+
 (***************)
 (* Data Races *)
 (***************)
