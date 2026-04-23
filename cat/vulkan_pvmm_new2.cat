@@ -184,10 +184,10 @@ irreflexive locord; (co | rf | fr) as irreflexive-locord
 // rmw events are atomic
 empty rmw & ((fr & ext); (co & ext)) as atomic
 
-// coherence order cannot contradict locord
-empty ((W * W) & locord) \ co as consistent-co
+// consistent coherence order
+empty ((W * W) & locord) \ id \ co as consistent-co
 empty ((W * W) & mutordatom) \ (co | co^-1)
-empty ((IW * (W \ IW)) & vloc) \ co
+empty ((IW * (W \ IW)) & loc & vloc) \ co
 
 (***************)
 (* Data Races *)
