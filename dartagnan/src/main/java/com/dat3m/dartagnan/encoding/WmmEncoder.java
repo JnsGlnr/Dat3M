@@ -413,6 +413,7 @@ public class WmmEncoder {
 
         @Override
         public Void visitComposition(Composition comp) {
+            final ExecutionAnalysis exec = context.getAnalysisContext().requires(ExecutionAnalysis.class);
             final Relation rel = comp.getDefinedRelation();
             final Relation r1 = comp.getLeftOperand();
             final Relation r2 = comp.getRightOperand();
@@ -424,16 +425,25 @@ public class WmmEncoder {
             EncodingContext.EdgeEncoder enc2 = context.edge(r2);
             final EventGraph a1 = EventGraph.union(getActiveSet(r1.getDefinition()), k1.getMustSet());
             final EventGraph a2 = EventGraph.union(getActiveSet(r2.getDefinition()), k2.getMustSet());
-            Map<Event, Set<Event>> out = k1.getMaySet().getOutMap();
+            final Map<Event, Set<Event>> out = k1.getMaySet().getOutMap();
+
             getActiveSet(comp).apply((e1, e2) -> {
                 BooleanFormula expr = bmgr.makeFalse();
                 if (k.getMustSet().contains(e1, e2)) {
                     expr = execution(e1, e2);
                 } else {
                     for (Event e : out.getOrDefault(e1, Set.of())) {
-                        if (k2.getMaySet().contains(e, e2)) {
-                            verify(a1.contains(e1, e) && a2.contains(e, e2),
-                                    "Failed to properly propagate active sets across composition at triple: (%s, %s, %s).", e1, e, e2);
+                        if (!k2.getMaySet().contains(e, e2)) {
+                            continue;
+                        }
+
+                        verify(a1.contains(e1, e) && a2.contains(e, e2),
+                                "Failed to properly propagate active sets across composition at triple: (%s, %s, %s).", e1, e, e2);
+                        if (k2.getMustSet().contains(e, e2) && (exec.isImplied(e, e2) || exec.isImplied(e1, e2))) {
+                            expr = bmgr.or(expr, enc1.encode(e1, e));
+                        } else if (k1.getMustSet().contains(e1, e) && (exec.isImplied(e, e1) || exec.isImplied(e2, e1))) {
+                            expr = bmgr.or(expr, enc2.encode(e, e2));
+                        } else {
                             expr = bmgr.or(expr, bmgr.and(enc1.encode(e1, e), enc2.encode(e, e2)));
                         }
                     }
@@ -465,6 +475,7 @@ public class WmmEncoder {
 
         @Override
         public Void visitTransitiveClosure(TransitiveClosure trans) {
+            final ExecutionAnalysis exec = context.getAnalysisContext().requires(ExecutionAnalysis.class);
             final Relation rel = trans.getDefinedRelation();
             final Relation r1 = trans.getOperand();
             final EventGraph relMustSet = ra.getKnowledge(rel).getMustSet();
@@ -482,8 +493,14 @@ public class WmmEncoder {
                         orClause = bmgr.or(orClause, enc1.encode(e1, e2));
                     }
                     for (Event e : r1MaySet.getRange(e1)) {
-                        if (e.getGlobalId() != e1.getGlobalId() && e.getGlobalId() != e2.getGlobalId() && relMaySet.contains(e, e2)) {
-                            BooleanFormula tVar = relMustSet.contains(e1, e) ? enc0.encode(e1, e) : enc1.encode(e1, e);
+                        if (e != e1 && e != e2 && relMaySet.contains(e, e2)) {
+                            BooleanFormula tVar;
+                            if (relMustSet.contains(e1, e)) {
+                                tVar = exec.isImplied(e, e1) || exec.isImplied(e2, e1) ? bmgr.makeTrue() : execution(e1, e2);
+                            } else {
+                                tVar = enc1.encode(e1, e);
+                            }
+                            // BooleanFormula tVar = relMustSet.contains(e1, e) ? enc0.encode(e1, e) : enc1.encode(e1, e);
                             orClause = bmgr.or(orClause, bmgr.and(tVar, enc0.encode(e, e2)));
                         }
                     }
