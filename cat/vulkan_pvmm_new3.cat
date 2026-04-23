@@ -77,11 +77,11 @@ let sw = inscope & (
     ([REL & F]; po?; [CBAR]; ((syncbar & inscope) \ id); [CBAR]; po?; [ACQ & F])                        // fence->cbar->cbar->fence,
 )
 
-let ithb(SC, SEMSC) = ((SC * SC) & rf & mutordatom) | (((SC * SC) & rf & mutordatom)?; (ssw |
+let ithb(SC, SEMSC) = (ssw |
         ([SEMSC]; sw; [SEMSC]) |
         ([(NONPRIV & SC) | SEMSC]; po; [REL & SEMSC]) |
         ([ACQ & SEMSC]; po; [(NONPRIV & SC) | SEMSC])
-    )+)
+    )+
 
 let ithb0 = ithb(SC0, SEMSC0)
 let ithb1 = ithb(SC1, SEMSC1)
@@ -137,15 +137,30 @@ let viswg3 = [WG]; ([SEMVIS & SEMSC3]; (chains & ithb3 & ssg))?; vissg3; (vloc &
 let visqf3 = [QF]; ([SEMVIS & SEMSC3]; (chains & ithb3 & swg))?; viswg3; (vloc & ((swg & ithb3); viswg3))?
 let visdv3 = [DV]; ([SEMVIS & SEMSC3]; (chains & ithb3 & sqf))?; visqf3; (vloc & ((sqf & ithb3); visqf3))?
 
-let locordww = (avsg0; (ithb0 & ssg)) | (avwg0; (ithb0 & swg)) | (avqf0; (ithb0 & sqf)) | (avdv0; ithb0) |
+let locordww = asmo |
+               (avsg0; (ithb0 & ssg)) | (avwg0; (ithb0 & swg)) | (avqf0; (ithb0 & sqf)) | (avdv0; ithb0) |
                (avsg1; (ithb1 & ssg)) | (avwg1; (ithb1 & swg)) | (avqf1; (ithb1 & sqf)) | (avdv1; ithb1) |
                (avsg2; (ithb2 & ssg)) | (avwg2; (ithb2 & swg)) | (avqf2; (ithb2 & sqf)) | (avdv2; ithb2) |
                (avsg3; (ithb3 & ssg)) | (avwg3; (ithb3 & swg)) | (avqf3; (ithb3 & sqf)) | (avdv3; ithb3)
 
-let locordwr = (avsg0; (ithb0 & ssg); vissg0) | (avwg0; (ithb0 & swg); viswg0) | (avqf0; (ithb0 & sqf); visqf0) | (avdv0; ithb0; visdv0) |
-               (avsg1; (ithb1 & ssg); vissg1) | (avwg1; (ithb1 & swg); viswg1) | (avqf1; (ithb1 & sqf); visqf1) | (avdv1; ithb1; visdv1) |
-               (avsg2; (ithb2 & ssg); vissg2) | (avwg2; (ithb2 & swg); viswg2) | (avqf2; (ithb2 & sqf); visqf2) | (avdv2; ithb2; visdv2) |
-               (avsg3; (ithb3 & ssg); vissg3) | (avwg3; (ithb3 & swg); viswg3) | (avqf3; (ithb3 & sqf); visqf3) | (avdv3; ithb3; visdv3)
+let asrf = rf & mutordatom
+
+let locordwr = ((((SC0 * SC0) & asrf & ssg) | (avsg0; (ithb0 & ssg))); vissg0) |
+               ((((SC0 * SC0) & asrf & swg) | (avwg0; (ithb0 & swg))); viswg0) |
+               ((((SC0 * SC0) & asrf & sqf) | (avqf0; (ithb0 & sqf))); visqf0) |
+               ((((SC0 * SC0) & asrf) | (avdv0; ithb0)); visdv0) |
+               ((((SC1 * SC1) & asrf & ssg) | (avsg1; (ithb1 & ssg))); vissg1) |
+               ((((SC1 * SC1) & asrf & swg) | (avwg1; (ithb1 & swg))); viswg1) |
+               ((((SC1 * SC1) & asrf & sqf) | (avqf1; (ithb1 & sqf))); visqf1) |
+               ((((SC1 * SC1) & asrf) | (avdv1; ithb1)); visdv1) |
+               ((((SC2 * SC2) & asrf & ssg) | (avsg2; (ithb2 & ssg))); vissg2) |
+               ((((SC2 * SC2) & asrf & swg) | (avwg2; (ithb2 & swg))); viswg2) |
+               ((((SC2 * SC2) & asrf & sqf) | (avqf2; (ithb2 & sqf))); visqf2) |
+               ((((SC2 * SC2) & asrf) | (avdv2; ithb2)); visdv2) |
+               ((((SC3 * SC3) & asrf & ssg) | (avsg3; (ithb3 & ssg))); vissg3) |
+               ((((SC3 * SC3) & asrf & ssg) | (avwg3; (ithb3 & swg))); viswg3) |
+               ((((SC3 * SC3) & asrf & ssg) | (avqf3; (ithb3 & sqf))); visqf3) |
+               ((((SC3 * SC3) & asrf & ssg) | (avdv3; ithb3)); visdv3)
 
 let schb = ([SC0]; ithb0) | ([SC1]; ithb1) | ([SC2]; ithb2) | ([SC3]; ithb3)
 let hbsc = (ithb0; [SC0]) | (ithb1; [SC1]) | (ithb2; [SC2]) | (ithb3; [SC3])
@@ -158,6 +173,7 @@ let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
               (ithb23 & ((SC2 * SC3) | (SC3 * SC2)))
 
 let locord = loc & (
+    (IW * (M \ IW)) |
     ([R]; ssw+; [R | W]) |
     ([W]; schb; [AVDEVICE]; hbsc; [W]) |
     ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]) |
@@ -174,11 +190,11 @@ let locord = loc & (
 (***********************)
 
 // locord, rf, fr, asmo must not form cycles
-let sfr = rf^-1; (asmo | (loc & (IW * (W \ IW))))
-acyclic (locord | rf | sfr | asmo) as consistency-cycle
+acyclic (locord | (mutordatom & (co | rf | fr))) as consistency-cycle
 
 // load cannot read-from a value that is shadowed by another write
-empty rf & ([W]; locord; ([W]; locord)+) as consistency-rf
+empty rf & ([W]; (locord | asmo); ([W]; (locord | asmo))+) as consistency-rf
+irreflexive locord; (co | rf | fr) as irreflexive-locord
 
 // rmw events are atomic
 empty rmw & ((fr & ext); (co & ext)) as atomic
@@ -193,5 +209,11 @@ empty ((IW * (W \ IW)) & vloc) \ co
 (***************)
 
 let pair_with_write = ((W * W) | (W * R) | (R * W)) \ ((IW * _) | (_ * IW)) // ignore IW
-let dr = loc & (pair_with_write \ mutordatom \ id \ (locord | locord^-1))
+let ord-ww = (((W * W) & locord) | asmo)+
+let ord-wr = ord-ww? ; ((locord & (W * R)) | (rf & mutordatom))
+let race-ww = (loc & (W * W) & pair_with_write) \ id \ mutordatom \ ord-ww \ (ord-ww^-1)
+let race-wr = (loc & (W * R) & pair_with_write) \ mutordatom \ ord-wr \ locord^-1
+let race-rw = (loc & (R * W) & pair_with_write) \ mutordatom \ locord \ (ord-wr^-1)
+
+let dr = race-ww | race-wr | race-rw
 flag ~empty dr as racy
