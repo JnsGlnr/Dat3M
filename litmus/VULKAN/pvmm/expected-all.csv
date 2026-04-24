@@ -120,7 +120,7 @@ x-barrier-overwrite-c,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 x-barrier-overwrite-d,FAIL,FAIL,FAIL,PASS,PASS,PASS,PASS
 x-barrier-overread-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 x-barrier-overread-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
-x-barrier-overread-c,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+x-barrier-overread-c,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 x-barrier-overread-d,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,
 x-sb,PASS,PASS,PASS,PASS,PASS,PASS,PASS

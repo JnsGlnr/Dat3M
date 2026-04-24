@@ -6,4 +6,4 @@ Vulkan
                           | ld.nonpriv.sc0 r0, x     ;
                           | ld.vis.wg.sc0 r1, x      ;
 exists
-(P1:r1 != 2)
+(P1:r0 != 2 \/ P1:r1 != 2)
