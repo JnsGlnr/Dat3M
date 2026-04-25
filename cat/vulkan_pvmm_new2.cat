@@ -174,31 +174,30 @@ let locord = loc & (
 (* Memory Model Axioms *)
 (***********************)
 
-// locord, rf, fr, asmo must not form cycles
+// consistent communication
 acyclic (locord | (mutordatom & (co | rf | fr))) as consistency-cycle
+irreflexive locord; (co | rf | fr) as irreflexive-locord
 
 // load cannot read-from a value that is shadowed by another write
 empty rf & ([W]; (locord | asmo); ([W]; (locord | asmo))+) as consistency-rf
-irreflexive locord; (co | rf | fr) as irreflexive-locord
 
 // rmw events are atomic
 empty rmw & ((fr & ext); (co & ext)) as atomic
 
 // consistent coherence order
-empty ((W * W) & locord) \ id \ co as consistent-co
-empty ((W * W) & mutordatom) \ (co | co^-1)
-empty ((IW * (W \ IW)) & loc & vloc) \ co
+empty ((W * W) & locord) \ co \ id as consistent-co
+empty ((W * W) & mutordatom) \ co \ co^-1
 
 (***************)
 (* Data Races *)
 (***************)
 
-let pair_with_write = ((W * W) | (W * R) | (R * W)) \ ((IW * _) | (_ * IW)) // ignore IW
+// TODO: The (IW * IW) is used as a workaround for incorrect alias implementation in Dat3M
 let ord-ww = (((W * W) & locord) | asmo)+
 let ord-wr = ord-ww? ; ((locord & (W * R)) | (rf & mutordatom))
-let race-ww = (loc & (W * W) & pair_with_write) \ id \ mutordatom \ ord-ww \ (ord-ww^-1)
-let race-wr = (loc & (W * R) & pair_with_write) \ mutordatom \ ord-wr \ locord^-1
-let race-rw = (loc & (R * W) & pair_with_write) \ mutordatom \ locord \ (ord-wr^-1)
+let race-ww = (loc & (W * W)) \ mutordatom \ ord-ww \ ord-ww^-1 \ id \ (IW * IW)
+let race-wr = (loc & (W * R)) \ mutordatom \ ord-wr \ locord^-1
+let race-rw = (loc & (R * W)) \ mutordatom \ locord \ ord-wr^-1
 
 let dr = race-ww | race-wr | race-rw
 flag ~empty dr as racy

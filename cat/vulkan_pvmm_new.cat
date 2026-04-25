@@ -184,8 +184,8 @@ empty rf & ([W]; locord; ([W]; locord)+) as consistency-rf
 empty rmw & ((fr & ext); (co & ext)) as atomic
 
 // consistent coherence order
-empty ((W * W) & locord) \ id \ co as consistent-co
-empty ((W * W) & mutordatom) \ (co | co^-1)
+empty ((W * W) & locord) \ co \ id as consistent-co
+empty ((W * W) & mutordatom) \ co \ co^-1
 empty ((IW * (W \ IW)) & loc & vloc) \ co
 
 (***************)

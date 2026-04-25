@@ -158,6 +158,7 @@ let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
               (ithb23 & ((SC2 * SC3) | (SC3 * SC2)))
 
 let locord = loc & (
+    (IW * (M \ IW)) |
     ([R]; ssw+; [W]) |
     ([W]; schb; [AVDEVICE]; hbsc; [W]) |
     ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]) |
@@ -183,9 +184,8 @@ empty rf & ([W]; locord; ([W]; locord)+) as consistency-rf
 empty rmw & ((fr & ext); (co & ext)) as atomic
 
 // consistent coherence order
-empty ((W * W) & locord) \ id \ co as consistent-co
-empty ((W * W) & mutordatom) \ (co | co^-1)
-empty ((IW * (W \ IW)) & loc & vloc) \ co
+empty ((W * W) & locord) \ co \ id as consistent-co
+empty ((W * W) & mutordatom) \ co \ co^-1
 
 (***************)
 (* Data Races *)
