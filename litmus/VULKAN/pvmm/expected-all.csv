@@ -144,6 +144,7 @@ x-avvis-mp-good-scope-avvis,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,,
 x-locord-rr-cycle,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 x-locord-rr-visibility,FAIL,FAIL,FAIL,FAIL,PASS,PASS,PASS,PASS
+x-locord-overwrite,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,,
 extra-mp3-fence-order-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 extra-mp3-fence-order-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
