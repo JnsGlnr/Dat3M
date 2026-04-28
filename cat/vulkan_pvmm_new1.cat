@@ -157,22 +157,70 @@ let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
               (ithb13 & ((SC1 * SC3) | (SC3 * SC1))) |
               (ithb23 & ((SC2 * SC3) | (SC3 * SC2)))
 
-let locord = loc & (
-    (IW * (M \ IW)) |
-    ([R]; ssw+; [R | W]) |
-    ([W]; schb; [AVDEVICE]; hbsc; [W]) |
-    ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]) |
-    ([R & NONPRIV]; (schbsc | schbsca); [(R | W) & NONPRIV]) |
-    vloc & (
-        ((po | schbsc) & int) |
-        ([W & NONPRIV]; locordww; [W & NONPRIV]) |
-        ([W & NONPRIV]; locordwr; [R & NONPRIV])
-    )
-)
+
+let asrf = rf & mutordatom
+
+let obs = ([SC0 & NONPRIV]; (asrf & ssg & (SG * SG)); vissg0) |
+          ([SC0 & NONPRIV]; (asrf & swg & (WG * WG)); viswg0) |
+          ([SC0 & NONPRIV]; (asrf & sqf & (QF * QF)); visqf0) |
+          ([SC0 & NONPRIV]; (asrf & (DV * DV)); visdv0) |
+          ([SC1 & NONPRIV]; (asrf & ssg & (SG * SG)); vissg1) |
+          ([SC1 & NONPRIV]; (asrf & swg & (WG * WG)); viswg1) |
+          ([SC1 & NONPRIV]; (asrf & sqf & (QF * QF)); visqf1) |
+          ([SC1 & NONPRIV]; (asrf & (DV * DV)); visdv1) |
+          ([SC2 & NONPRIV]; (asrf & ssg & (SG * SG)); vissg2) |
+          ([SC2 & NONPRIV]; (asrf & swg & (WG * WG)); viswg2) |
+          ([SC2 & NONPRIV]; (asrf & sqf & (QF * QF)); visqf2) |
+          ([SC2 & NONPRIV]; (asrf & (DV * DV)); visdv2) |
+          ([SC3 & NONPRIV]; (asrf & ssg & (SG * SG)); vissg3) |
+          ([SC3 & NONPRIV]; (asrf & swg & (WG * WG)); viswg3) |
+          ([SC3 & NONPRIV]; (asrf & sqf & (QF * QF)); visqf3) |
+          ([SC3 & NONPRIV]; (asrf & (DV * DV)); visdv3)
+
+let obw = ([SC0 & NONPRIV]; (asrf & ssg & (SG * SG)); (ithb0 & ssg)) |
+          ([SC0 & NONPRIV]; (asrf & swg & (WG * WG)); (ithb0 & swg)) |
+          ([SC0 & NONPRIV]; (asrf & sqf & (QF * QF)); (ithb0 & sqf)) |
+          ([SC0 & NONPRIV]; (asrf & (DV * DV)); ithb0) |
+          ([SC1 & NONPRIV]; (asrf & ssg & (SG * SG)); (ithb1 & ssg)) |
+          ([SC1 & NONPRIV]; (asrf & swg & (WG * WG)); (ithb1 & swg)) |
+          ([SC1 & NONPRIV]; (asrf & sqf & (QF * QF)); (ithb1 & sqf)) |
+          ([SC1 & NONPRIV]; (asrf & (DV * DV)); ithb1) |
+          ([SC2 & NONPRIV]; (asrf & ssg & (SG * SG)); (ithb2 & ssg)) |
+          ([SC2 & NONPRIV]; (asrf & swg & (WG * WG)); (ithb2 & swg)) |
+          ([SC2 & NONPRIV]; (asrf & sqf & (QF * QF)); (ithb2 & sqf)) |
+          ([SC2 & NONPRIV]; (asrf & (DV * DV)); ithb2) |
+          ([SC3 & NONPRIV]; (asrf & ssg & (SG * SG)); (ithb3 & ssg)) |
+          ([SC3 & NONPRIV]; (asrf & swg & (WG * WG)); (ithb3 & swg)) |
+          ([SC3 & NONPRIV]; (asrf & sqf & (QF * QF)); (ithb3 & sqf)) |
+          ([SC3 & NONPRIV]; (asrf & (DV * DV)); ithb3)
+
+let ord-ww0 = loc & ((IW * (W \ IW)) | ([W]; schb; [AVDEVICE]; hbsc; [W]))
+let ord-ww1 = ord-ww0?; (asmo | (loc & vloc & ([W & NONPRIV]; locordww; [W & NONPRIV])) | (loc & vloc & ((W & NONPRIV) * (W & NONPRIV)) & po) | (loc & vloc & ([W & NONPRIV]; obw; [W & NONPRIV])) | (loc & vloc & ([W & NONPRIV]; asrf; po; [W & NONPRIV])))+
+let ord-ww2 = ord-ww0?; (loc & vloc & (W * W) & po)
+let ord-ww = ord-ww0 | ord-ww1 | ord-ww2
+
+let ord-wr0 = loc & ((IW * R) | ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]))
+let ord-wr1 = (ord-ww0 | ord-ww1)?; ((loc & vloc & obs) | (loc & vloc & ([W & NONPRIV]; locordwr; [R & NONPRIV])) | (loc & vloc & ((W & NONPRIV) * (R & NONPRIV)) & po))
+let ord-wr2 = (ord-ww0 | ord-ww2)?; (loc & vloc & (W * R) & po)
+let ord-wr = ord-wr0 | ord-wr1 | ord-wr2
+
+let ord-r0 = loc & ([R]; ssw+; [W | R])
+let ord-r1 = loc & ([R & NONPRIV]; (po | schbsc | schbsca); [(W | R) & NONPRIV])
+let ord-r2 = loc & vloc & ([R]; po)
+let ord-r = ord-r0 | ord-r1 | ord-r2
+
+let locord = ord-ww | ord-wr | ord-r
 
 (***********************)
 (* Memory Model Axioms *)
 (***********************)
+
+acyclic po & vloc & (co | rf | fr) as uniproc
+
+irreflexive [SC0]; ithb0
+irreflexive [SC1]; ithb1
+irreflexive [SC2]; ithb2
+irreflexive [SC3]; ithb3
 
 // consistent communication
 acyclic (locord | (mutordatom & (co | rf | fr))) as consistency-cycle
@@ -193,5 +241,5 @@ empty ((W * W) & mutordatom) \ co \ co^-1
 (***************)
 
 let pair_with_write = ((W * W) | (W * R) | (R * W)) \ ((IW * _) | (_ * IW)) // ignore IW
-let dr = loc & (pair_with_write \ mutordatom \ id \ (locord | locord^-1))
+let dr = loc & (pair_with_write \ mutordatom \ id \ (locord | locord^-1) \ (int & vloc))
 flag ~empty dr as racy
