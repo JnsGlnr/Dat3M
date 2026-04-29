@@ -139,22 +139,74 @@ let visdv3 = [DV]; ([SEMVIS & SEMSC3]; (chains & ithb3 & sqf))?; visqf3; (vloc &
 
 let asrf = rf & mutordatom
 
-let locordww = po |
-               (avsg0; (ithb0 & ssg)) | (avwg0; (ithb0 & swg)) | (avqf0; (ithb0 & sqf)) | (avdv0; ithb0) |
-               (avsg1; (ithb1 & ssg)) | (avwg1; (ithb1 & swg)) | (avqf1; (ithb1 & sqf)) | (avdv1; ithb1) |
-               (avsg2; (ithb2 & ssg)) | (avwg2; (ithb2 & swg)) | (avqf2; (ithb2 & sqf)) | (avdv2; ithb2) |
-               (avsg3; (ithb3 & ssg)) | (avwg3; (ithb3 & swg)) | (avqf3; (ithb3 & sqf)) | (avdv3; ithb3)
+let locordww = (ssg & (avsg0; ithb0)) |
+               (swg & (avwg0; ithb0)) |
+               (sqf & (avqf0; ithb0)) |
+               (avdv0; ithb0) |
+               (ssg & (avsg1; ithb1)) |
+               (swg & (avwg1; ithb1)) |
+               (sqf & (avqf1; ithb1)) |
+               (avdv1; ithb1) |
+               (ssg & (avsg2; ithb2)) |
+               (swg & (avwg2; ithb2)) |
+               (sqf & (avqf2; ithb2)) |
+               (avdv2; ithb2) |
+               (ssg & (avsg3; ithb3)) |
+               (swg & (avwg3; ithb3)) |
+               (sqf & (avqf3; ithb3)) |
+               (avdv3; ithb3)
 
-let locordwr = po |
-               (avsg0; (ithb0 & ssg); vissg0) | (avwg0; (ithb0 & swg); viswg0) | (avqf0; (ithb0 & sqf); visqf0) | (avdv0; ithb0; visdv0) |
-               (avsg1; (ithb1 & ssg); vissg1) | (avwg1; (ithb1 & swg); viswg1) | (avqf1; (ithb1 & sqf); visqf1) | (avdv1; ithb1; visdv1) |
-               (avsg2; (ithb2 & ssg); vissg2) | (avwg2; (ithb2 & swg); viswg2) | (avqf2; (ithb2 & sqf); visqf2) | (avdv2; ithb2; visdv2) |
-               (avsg3; (ithb3 & ssg); vissg3) | (avwg3; (ithb3 & swg); viswg3) | (avqf3; (ithb3 & sqf); visqf3) | (avdv3; ithb3; visdv3)
+let locordwr = (ssg & (avsg0; ithb0; vissg0)) |
+               (swg & (avwg0; ithb0; viswg0)) |
+               (sqf & (avqf0; ithb0; visqf0)) |
+               (avdv0; ithb0; visdv0) |
+               (ssg & (avsg1; ithb1; vissg1)) |
+               (swg & (avwg1; ithb1; viswg1)) |
+               (sqf & (avqf1; ithb1; visqf1)) |
+               (avdv1; ithb1; visdv1) |
+               (ssg & (avsg2; ithb2; vissg2)) |
+               (swg & (avwg2; ithb2; viswg2)) |
+               (sqf & (avqf2; ithb2; visqf2)) |
+               (avdv2; ithb2; visdv2) |
+               (ssg & (avsg3; ithb3; vissg3)) |
+               (swg & (avwg3; ithb3; viswg3)) |
+               (sqf & (avqf3; ithb3; visqf3)) |
+               (avdv3; ithb3; visdv3)
 
-let obs = ([SC0 & SG]; (asrf & ssg); vissg0) | ([SC0 & WG]; (asrf & swg); viswg0) | ([SC0 & QF]; (asrf & sqf); visqf0) | ([SC0 & DV]; asrf; visdv0) |
-          ([SC1 & SG]; (asrf & ssg); vissg1) | ([SC1 & WG]; (asrf & swg); viswg1) | ([SC1 & QF]; (asrf & sqf); visqf1) | ([SC1 & DV]; asrf; visdv1) |
-          ([SC2 & SG]; (asrf & ssg); vissg2) | ([SC2 & WG]; (asrf & swg); viswg2) | ([SC2 & QF]; (asrf & sqf); visqf2) | ([SC2 & DV]; asrf; visdv2) |
-          ([SC3 & SG]; (asrf & ssg); vissg3) | ([SC3 & WG]; (asrf & swg); viswg3) | ([SC3 & QF]; (asrf & sqf); visqf3) | ([SC3 & DV]; asrf; visdv3)
+let obs = (ssg & ([SC0 & SG]; asrf; vissg0)) |
+          (swg & ([SC0 & WG]; asrf; viswg0)) |
+          (sqf & ([SC0 & QF]; asrf; visqf0)) |
+          ([SC0 & DV]; asrf; visdv0) |
+          (ssg & ([SC1 & SG]; asrf; vissg1)) |
+          (swg & ([SC1 & WG]; asrf; viswg1)) |
+          (sqf & ([SC1 & QF]; asrf; visqf1)) |
+          ([SC1 & DV]; asrf; visdv1) |
+          (ssg & ([SC2 & SG]; asrf; vissg2)) |
+          (swg & ([SC2 & WG]; asrf; viswg2)) |
+          (sqf & ([SC2 & QF]; asrf; visqf2)) |
+          ([SC2 & DV]; asrf; visdv2) |
+          (ssg & ([SC3 & SG]; asrf; vissg3)) |
+          (swg & ([SC3 & WG]; asrf; viswg3)) |
+          (sqf & ([SC3 & QF]; asrf; visqf3)) |
+          ([SC3 & DV]; asrf; visdv3)
+
+let obw = asmo | (asrf; po) |
+          (ssg & ([SC0 & SG]; asrf; [SG]; ithb0)) |
+          (swg & ([SC0 & WG]; asrf; [WG]; ithb0)) |
+          (sqf & ([SC0 & QF]; asrf; [QF]; ithb0)) |
+          ([SC0 & DV]; asrf; [DV]; ithb0) |
+          (ssg & ([SC1 & SG]; asrf; [SG]; ithb1)) |
+          (swg & ([SC1 & WG]; asrf; [WG]; ithb1)) |
+          (sqf & ([SC1 & QF]; asrf; [QF]; ithb1)) |
+          ([SC1 & DV]; asrf; [DV]; ithb1) |
+          (ssg & ([SC2 & SG]; asrf; [SG]; ithb2)) |
+          (swg & ([SC2 & WG]; asrf; [WG]; ithb2)) |
+          (sqf & ([SC2 & QF]; asrf; [QF]; ithb2)) |
+          ([SC2 & DV]; asrf; [DV]; ithb2) |
+          (ssg & ([SC3 & SG]; asrf; [SG]; ithb3)) |
+          (swg & ([SC3 & WG]; asrf; [WG]; ithb3)) |
+          (sqf & ([SC3 & QF]; asrf; [QF]; ithb3)) |
+          ([SC3 & DV]; asrf; [DV]; ithb3)
 
 let schb = ([SC0]; ithb0) | ([SC1]; ithb1) | ([SC2]; ithb2) | ([SC3]; ithb3)
 let hbsc = (ithb0; [SC0]) | (ithb1; [SC1]) | (ithb2; [SC2]) | (ithb3; [SC3])
@@ -166,37 +218,19 @@ let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
               (ithb13 & ((SC1 * SC3) | (SC3 * SC1))) |
               (ithb23 & ((SC2 * SC3) | (SC3 * SC2)))
 
-let obw = asmo | (asrf; po) |
-          ([SC0 & SG]; (ssg & (asrf; [SG]; ithb0))) |
-          ([SC0 & WG]; (swg & (asrf; [WG]; ithb0))) |
-          ([SC0 & QF]; (sqf & (asrf; [QF]; ithb0))) |
-          ([SC0 & DV]; (asrf; [DV]; ithb0)) |
-          ([SC1 & SG]; (ssg & (asrf; [SG]; ithb1))) |
-          ([SC1 & WG]; (swg & (asrf; [WG]; ithb1))) |
-          ([SC1 & QF]; (sqf & (asrf; [QF]; ithb1))) |
-          ([SC1 & DV]; (asrf; [DV]; ithb1)) |
-          ([SC2 & SG]; (ssg & (asrf; [SG]; ithb2))) |
-          ([SC2 & WG]; (swg & (asrf; [WG]; ithb2))) |
-          ([SC2 & QF]; (sqf & (asrf; [QF]; ithb2))) |
-          ([SC2 & DV]; (asrf; [DV]; ithb2)) |
-          ([SC3 & SG]; (ssg & (asrf; [SG]; ithb3))) |
-          ([SC3 & WG]; (swg & (asrf; [WG]; ithb3))) |
-          ([SC3 & QF]; (sqf & (asrf; [QF]; ithb3))) |
-          ([SC3 & DV]; (asrf; [DV]; ithb3))
-
 let ord-ww0 = loc & ([W]; schb; [AVDEVICE]; hbsc; [W])
-let ord-ww1 = ord-ww0?; (loc & vloc & ((W & NONPRIV) * (W & NONPRIV)) & (locordww | obw))+
-let ord-ww2 = ord-ww0?; (loc & vloc & (W * W) & po)
+let ord-ww1 = ord-ww0?; (vloc & ((W & NONPRIV) * (W & NONPRIV)) & (po | locordww | obw))+
+let ord-ww2 = ord-ww0?; (vloc & (W * W) & po)
 let ord-ww = ord-ww0 | ord-ww1 | ord-ww2
 
 let ord-wr0 = loc & ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R])
-let ord-wr1 = (ord-ww0 | ord-ww1)?; (loc & vloc & ((W & NONPRIV) * (R & NONPRIV)) & (obs | locordwr))
-let ord-wr2 = ord-ww0?; (loc & vloc & (W * R) & po)
+let ord-wr1 = (ord-ww0 | ord-ww1)?; (vloc & ((W & NONPRIV) * (R & NONPRIV)) & (po | locordwr | obs))
+let ord-wr2 = ord-ww0?; (vloc & (W * R) & po)
 let ord-wr = ord-wr0 | ord-wr1 | ord-wr2
 
 let ord-r0 = loc & ([R]; ssw+; [W | R])
 let ord-r1 = loc & ([R & NONPRIV]; (po | schbsc | schbsca); [(W | R) & NONPRIV])
-let ord-r2 = loc & vloc & ([R]; po)
+let ord-r2 = vloc & ([R]; po)
 let ord-r = ord-r0 | ord-r1 | ord-r2
 
 let locord = (loc & (IW * (M \ IW))) | ord-ww | ord-wr | ord-r
