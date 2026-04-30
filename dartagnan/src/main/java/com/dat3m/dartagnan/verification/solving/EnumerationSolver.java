@@ -23,6 +23,7 @@ import org.sosy_lab.java_smt.api.SolverException;
 
 import java.math.BigInteger;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.dat3m.dartagnan.utils.Result.UNKNOWN;
 
@@ -140,7 +141,7 @@ public class EnumerationSolver extends ModelChecker {
         for (Map<Expression, Expression> state : visitedStates) {
             System.out.println(vars.stream()
                     .map(var -> compactExprString(var) + "=" + compactExprString(state.get(var)))
-                    .reduce((a, b) -> a + ", " + b).orElse(""));
+                    .collect(Collectors.joining(", " , "{ ", " }" )));
         }
         System.out.println("================================== ");
     }
