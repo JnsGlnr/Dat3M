@@ -148,7 +148,7 @@ public class EnumerationSolver extends ModelChecker {
 
     private String compactExprString(Expression expr) {
         if (expr instanceof Register reg) {
-            return reg.getThread().getId() + ":" + reg.getName();
+            return reg.getThread().getName() + ":" + reg.getName();
         } else if (expr instanceof FinalMemoryValue finalMemoryValue) {
             return finalMemoryValue.getName();
         } else if (expr instanceof IntLiteral intLiteral) {
