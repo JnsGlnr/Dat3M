@@ -80,7 +80,7 @@ test,vulkan_pvmm,vulkan_chains_union,vulkan_chains_new,vulkan_pvmm_new,vulkan_pv
 3-problem-vloc-av-chain7-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 3-problem-vloc-av-chain7-c,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 3-problem-vloc-av-chain7-d,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
-3-problem-vloc-av-chain8-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,FAIL
+3-problem-vloc-av-chain8-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 3-problem-vloc-av-chain8-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 3-problem-vloc-av-chain8-c,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 3-problem-vloc-av-chain9-a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
