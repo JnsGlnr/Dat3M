@@ -94,6 +94,7 @@ let ithb12 = ithb(SC12, SEMSC12)
 let ithb13 = ithb(SC13, SEMSC13)
 let ithb23 = ithb(SC23, SEMSC23)
 
+let obs = rf & mutordatom
 let obssg = (SG * SG) & rf & mutordatom
 let obswg = (WG * WG) & rf & mutordatom
 let obsqf = (QF * QF) & rf & mutordatom
@@ -158,20 +159,20 @@ let visqf3 = visqf3b; (vloc & sqf & (ithb3; visqf3b))*
 let visdv3b = [DV]; ([SEMVIS & SEMSC3]; (chains & ithb3 & sqf))?; visqf3
 let visdv3 = visdv3b; (vloc & (ithb3; visdv3b))*
 
-let avsg = ([SC0]; avsg0) | ([SC1]; avsg1) | ([SC2]; avsg2) | ([SC3]; avsg3)
-let avwg = ([SC0]; avwg0) | ([SC1]; avwg1) | ([SC2]; avwg2) | ([SC3]; avwg3)
-let avqf = ([SC0]; avqf0) | ([SC1]; avqf1) | ([SC2]; avqf2) | ([SC3]; avqf3)
-let avdv = ([SC0]; avdv0) | ([SC1]; avdv1) | ([SC2]; avdv2) | ([SC3]; avdv3)
+let avsg = avsg0 | avsg1 | avsg2 | avsg3
+let avwg = avwg0 | avwg1 | avwg2 | avwg3
+let avqf = avqf0 | avqf1 | avqf2 | avqf3
+let avdv = avdv0 | avdv1 | avdv2 | avdv3
 
-let vissg = (vissg0; [SC0]) | (vissg1; [SC1]) | (vissg2; [SC2]) | (vissg3; [SC3])
-let viswg = (viswg0; [SC0]) | (viswg1; [SC1]) | (viswg2; [SC2]) | (viswg3; [SC3])
-let visqf = (visqf0; [SC0]) | (visqf1; [SC1]) | (visqf2; [SC2]) | (visqf3; [SC3])
-let visdv = (visdv0; [SC0]) | (visdv1; [SC1]) | (visdv2; [SC2]) | (visdv3; [SC3])
+let vissg = vissg0 | vissg1 | vissg2 | vissg3
+let viswg = viswg0 | viswg1 | viswg2 | viswg3
+let visqf = visqf0 | visqf1 | visqf2 | visqf3
+let visdv = visdv0 | visdv1 | visdv2 | visdv3
 
-let avsghb = ([SC0]; avsg0; ithb0) | ([SC1]; avsg1; ithb1) | ([SC2]; avsg2; ithb2) | ([SC3]; avsg3; ithb3)
-let avwghb = ([SC0]; avwg0; ithb0) | ([SC1]; avwg1; ithb1) | ([SC2]; avwg2; ithb2) | ([SC3]; avwg3; ithb3)
-let avqfhb = ([SC0]; avqf0; ithb0) | ([SC1]; avqf1; ithb1) | ([SC2]; avqf2; ithb2) | ([SC3]; avqf3; ithb3)
-let avdvhb = ([SC0]; avdv0; ithb0) | ([SC1]; avdv1; ithb1) | ([SC2]; avdv2; ithb2) | ([SC3]; avdv3; ithb3)
+let avsghb = (avsg0; ithb0) | (avsg1; ithb1) | (avsg2; ithb2) | (avsg3; ithb3)
+let avwghb = (avwg0; ithb0) | (avwg1; ithb1) | (avwg2; ithb2) | (avwg3; ithb3)
+let avqfhb = (avqf0; ithb0) | (avqf1; ithb1) | (avqf2; ithb2) | (avqf3; ithb3)
+let avdvhb = (avdv0; ithb0) | (avdv1; ithb1) | (avdv2; ithb2) | (avdv3; ithb3)
 
 let schb = ([SC0]; ithb0) | ([SC1]; ithb1) | ([SC2]; ithb2) | ([SC3]; ithb3)
 let hbsc = (ithb0; [SC0]) | (ithb1; [SC1]) | (ithb2; [SC2]) | (ithb3; [SC3])
@@ -183,50 +184,41 @@ let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
               (ithb13 & ((SC1 * SC3) | (SC3 * SC1))) |
               (ithb23 & ((SC2 * SC3) | (SC3 * SC2)))
 
-let locordww = (ssg & ((avsg | obssg); hbsc)) |
-               (swg & ((avwg | obswg); hbsc)) |
-               (sqf & ((avqf | obsqf); hbsc)) |
-               ((avdv | obsdv); hbsc)
-
-let locordww2 = asmo | ((rf & mutordatom); po)
-
-let locordwr = (ssg & ((avsghb | obssg); vissg)) |
-               (swg & ((avwghb | obswg); viswg)) |
-               (sqf & ((avqfhb | obsqf); visqf)) |
-               ((avdvhb | obsdv); visdv)
-
-let hlocord = loc & (
+let locordh = loc & (
     (IW * (M \ IW)) |
     ([R]; ssw+; [W]) |
     ([W]; schb; [AVDEVICE]; hbsc; [W]) |
-    ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R])
-)
+    ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]))
 
-let ord-ww = (vloc & ((W & NONPRIV) * (W & NONPRIV)) & (po | locordww | locordww2))+
-let ord-wr = ord-ww?; (vloc & ((W & NONPRIV) * (R & NONPRIV)) & (po | locordwr))
-let ord-r = loc & ([R & NONPRIV]; (po | schbsc | schbsca); [W & NONPRIV])
+let locordth = vloc & int & (po | schbsc) // TODO: Is schbsc really needed here?
 
-let locord = hlocord |
-    (hlocord?; (vloc & po)) |
-    (hlocord?; (ord-ww | ord-wr | ord-r))
+let locordww = vloc & (W * W) & (NONPRIV * NONPRIV) & (
+    asmo | (obs?; po) |
+    (ssg & ((avsg | obssg); hbsc)) |
+    (swg & ((avwg | obswg); hbsc)) |
+    (sqf & ((avqf | obsqf); hbsc)) |
+    ((avdv | obsdv); hbsc))
+
+let locordwr = vloc & (W * R) & (NONPRIV * NONPRIV) & (
+    po |
+    (ssg & ((avsghb | obssg); vissg)) |
+    (swg & ((avwghb | obswg); viswg)) |
+    (sqf & ((avqfhb | obsqf); visqf)) |
+    ((avdvhb | obsdv); visdv))
+
+let locordrw = loc & (R * W) & (NONPRIV * NONPRIV) & (
+    po | schbsc | schbsca)
+
+let locord = locordh | (locordh?; locordth) |
+    (locordh?; (locordww+ | (locordww+?; locordwr) | locordrw))
 
 (***********************)
 (* Memory Model Axioms *)
 (***********************)
 
-acyclic po & vloc & (co | rf | fr) as uniproc
-
-irreflexive [SC0]; ithb0
-irreflexive [SC1]; ithb1
-irreflexive [SC2]; ithb2
-irreflexive [SC3]; ithb3
-
 // consistent communication
-acyclic (locord | (mutordatom & (co | rf | fr))) as consistency-cycle
+acyclic locord as consistency-cycle
 irreflexive locord; (co | rf | fr) as irreflexive-locord
-
-// load cannot read-from a value that is shadowed by another write
-empty rf & ([W]; locord; ([W]; locord)+) as consistency-rf
 
 // rmw events are atomic
 empty rmw & ((fr & ext); (co & ext)) as atomic
@@ -239,6 +231,7 @@ empty ((W * W) & mutordatom) \ co \ co^-1
 (* Data Races *)
 (***************)
 
-let pair_with_write = ((W * W) | (W * R) | (R * W)) \ ((IW * _) | (_ * IW)) // ignore IW
-let dr = loc & (pair_with_write \ mutordatom \ id \ (locord | locord^-1))
+let ord = mutordatom | locord | locord^-1
+// (IW * IW) is used as a workaround for the Dartagnan virtual memory bug
+let dr = loc \ id \ ord \ (R * R) \ (IW * IW)
 flag ~empty dr as racy
