@@ -28,8 +28,12 @@ test,vulkan_pvmm,vulkan_chains_union,vulkan_chains_new,vulkan_pvmm_new,vulkan_pv
 3-f-graph-problem-semsc-lb-fence-a,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 3-f-graph-problem-semsc-lb-fence-b,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
 ,,,,,,,,
-3-problem-race-asmo,PASS,PASS,PASS,PASS,FAIL,FAIL,FAIL,FAIL
-3-problem-race-asmo-alt,PASS,PASS,PASS,PASS,FAIL,FAIL,FAIL,FAIL
+3-problem-race-asmo-a,PASS,PASS,PASS,PASS,FAIL,FAIL,FAIL,FAIL
+3-problem-race-asmo-b,PASS,PASS,PASS,PASS,FAIL,FAIL,FAIL,FAIL
+3-problem-race-asmo-c,PASS,PASS,PASS,PASS,FAIL,PASS,FAIL,FAIL
+3-problem-race-asmo-alt-a,PASS,PASS,PASS,PASS,FAIL,FAIL,FAIL,FAIL
+3-problem-race-asmo-alt-b,PASS,PASS,PASS,PASS,FAIL,FAIL,FAIL,FAIL
+3-problem-race-asmo-alt-c,PASS,PASS,PASS,PASS,FAIL,PASS,FAIL,FAIL
 ,,,,,,,,
 3-new-race-wrr-1a,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 3-new-race-wrr-1b,PASS,PASS,PASS,PASS,PASS,PASS,PASS,PASS
