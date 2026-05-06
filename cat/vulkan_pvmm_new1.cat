@@ -190,7 +190,7 @@ let locordh = loc & (
     ([W]; schb; [AVDEVICE]; hbsc; [W]) |
     ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]))
 
-let locordth = vloc & int & (po | schbsc)
+let locordp = vloc & int & (po | schbsc) // TODO: Is schbsc really needed here?
 
 let locordww = vloc & (W * W) & (NONPRIV * NONPRIV) & (
     asmo | (obs?; po) |
@@ -209,7 +209,7 @@ let locordwr = vloc & (W * R) & (NONPRIV * NONPRIV) & (
 let locordrw = loc & (R * W) & (NONPRIV * NONPRIV) & (
     po | schbsc | schbsca)
 
-let locord = locordh | (locordh?; locordth) |
+let locord = locordh | (locordh?; locordp) |
     (locordh?; (locordww+ | (locordww+?; locordwr) | locordrw))
 
 (***********************)
