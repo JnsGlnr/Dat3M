@@ -94,12 +94,6 @@ let ithb12 = ithb(SC12, SEMSC12)
 let ithb13 = ithb(SC13, SEMSC13)
 let ithb23 = ithb(SC23, SEMSC23)
 
-let obs = rf & mutordatom
-let obssg = (SG * SG) & rf & mutordatom
-let obswg = (WG * WG) & rf & mutordatom
-let obsqf = (QF * QF) & rf & mutordatom
-let obsdv = (DV * DV) & rf & mutordatom
-
 let hb = po | ithb0 | ithb1 | ithb2 | ithb3 |
          ithb01 | ithb02 | ithb03 | ithb12 | ithb13 | ithb23
 
@@ -184,6 +178,12 @@ let schbsca = (ithb01 & ((SC0 * SC1) | (SC1 * SC0))) |
               (ithb13 & ((SC1 * SC3) | (SC3 * SC1))) |
               (ithb23 & ((SC2 * SC3) | (SC3 * SC2)))
 
+let obs = rf & mutordatom
+let obssg = (SG * SG) & obs
+let obswg = (WG * WG) & obs
+let obsqf = (QF * QF) & obs
+let obsdv = (DV * DV) & obs
+
 let locordh = loc & (
     (IW * (M \ IW)) |
     ([R]; ssw+; [W]) |
@@ -192,25 +192,16 @@ let locordh = loc & (
 
 let locordp = vloc & int & (po | schbsc) // TODO: Is schbsc really needed here?
 
-let locordww = vloc & (W * W) & (NONPRIV * NONPRIV) & (
-    asmo | (obs?; po) |
-    (ssg & ((avsg | obssg); hbsc)) |
-    (swg & ((avwg | obswg); hbsc)) |
-    (sqf & ((avqf | obsqf); hbsc)) |
-    ((avdv | obsdv); hbsc))
+let locordd = loc & (NONPRIV * NONPRIV) & (
+    ([R]; (schbsc | schbsca); [W]) |
+    vloc & (asmo | (obs?; po) |
+        ((W * W) & ((ssg & (obssg; hbsc)) | (swg & (obswg; hbsc)) | (sqf & (obsqf; hbsc)) | (obsdv; hbsc))) |
+        ((W * R) & ((ssg & (obssg; vissg)) | (swg & (obswg; viswg)) | (sqf & (obsqf; visqf)) | (obsdv; visdv))) |
+        ((W * W) & ((ssg & avsghb) | (swg & avwghb) | (sqf & avqfhb) | avdvhb)) |
+        ((W * R) & ((ssg & (avsghb; vissg)) | (swg & (avwghb; viswg)) | (sqf & (avqfhb; visqf)) | (avdvhb; visdv)))
+    ))
 
-let locordwr = vloc & (W * R) & (NONPRIV * NONPRIV) & (
-    po |
-    (ssg & ((avsghb | obssg); vissg)) |
-    (swg & ((avwghb | obswg); viswg)) |
-    (sqf & ((avqfhb | obsqf); visqf)) |
-    ((avdvhb | obsdv); visdv))
-
-let locordrw = loc & (R * W) & (NONPRIV * NONPRIV) & (
-    po | schbsc | schbsca)
-
-let locord = locordh | (locordh?; locordp) |
-    (locordh?; (locordww+ | (locordww+?; locordwr) | locordrw))
+let locord = locordh | (locordh?; locordp) | (locordh?; ((W * W) & locordd)*; locordd)
 
 (***********************)
 (* Memory Model Axioms *)

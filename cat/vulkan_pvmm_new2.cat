@@ -198,7 +198,7 @@ let locordwr = (avsg0; (ithb0 & ssg); vissg0) | (avwg0; (ithb0 & swg); viswg0) |
                (avsg3; (ithb3 & ssg); vissg3) | (avwg3; (ithb3 & swg); viswg3) | (avqf3; (ithb3 & sqf); visqf3) | (avdv3; ithb3; visdv3)
 
 let locordd = loc & (
-    ((NONPRIV * NONPRIV) & po) |
+    (vloc & (NONPRIV * NONPRIV) & po) |
     ([R & NONPRIV]; (schbsc | schbsca); [(R | W) & NONPRIV]) |
     vloc & (
         ([W & NONPRIV]; locordww; [W & NONPRIV]) |

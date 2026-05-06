@@ -169,6 +169,21 @@ let visqf3 = visqf3b; (vloc & sqf & (ithb3; visqf3b))*
 let visdv3b = [DV]; ([SEMVIS & SEMSC3]; (chains & ithb3 & sqf))?; visqf3
 let visdv3 = visdv3b; (vloc & (ithb3; visdv3b))*
 
+let avsg = avsg0 | avsg1 | avsg2 | avsg3
+let avwg = avwg0 | avwg1 | avwg2 | avwg3
+let avqf = avqf0 | avqf1 | avqf2 | avqf3
+let avdv = avdv0 | avdv1 | avdv2 | avdv3
+
+let vissg = vissg0 | vissg1 | vissg2 | vissg3
+let viswg = viswg0 | viswg1 | viswg2 | viswg3
+let visqf = visqf0 | visqf1 | visqf2 | visqf3
+let visdv = visdv0 | visdv1 | visdv2 | visdv3
+
+let avsghb = (avsg0; ithb0) | (avsg1; ithb1) | (avsg2; ithb2) | (avsg3; ithb3)
+let avwghb = (avwg0; ithb0) | (avwg1; ithb1) | (avwg2; ithb2) | (avwg3; ithb3)
+let avqfhb = (avqf0; ithb0) | (avqf1; ithb1) | (avqf2; ithb2) | (avqf3; ithb3)
+let avdvhb = (avdv0; ithb0) | (avdv1; ithb1) | (avdv2; ithb2) | (avdv3; ithb3)
+
 let schb = ([SC0]; ithb0) | ([SC1]; ithb1) | ([SC2]; ithb2) | ([SC3]; ithb3)
 let hbsc = (ithb0; [SC0]) | (ithb1; [SC1]) | (ithb2; [SC2]) | (ithb3; [SC3])
 let schbsc = (ithb0 & (SC0 * SC0)) | (ithb1 & (SC1 * SC1)) | (ithb2 & (SC2 * SC2)) | (ithb3 & (SC3 * SC3))
@@ -185,26 +200,14 @@ let locordh = loc & (
     ([W]; schb; [AVDEVICE]; hbsc; [W]) |
     ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]))
 
-let locordp = vloc & int & (po | schbsc)
+let locordp = vloc & int & (po | schbsc) // TODO: Is schbsc really needed here?
 
-let locordww = (avsg0; (ithb0 & ssg)) | (avwg0; (ithb0 & swg)) | (avqf0; (ithb0 & sqf)) | (avdv0; ithb0) |
-               (avsg1; (ithb1 & ssg)) | (avwg1; (ithb1 & swg)) | (avqf1; (ithb1 & sqf)) | (avdv1; ithb1) |
-               (avsg2; (ithb2 & ssg)) | (avwg2; (ithb2 & swg)) | (avqf2; (ithb2 & sqf)) | (avdv2; ithb2) |
-               (avsg3; (ithb3 & ssg)) | (avwg3; (ithb3 & swg)) | (avqf3; (ithb3 & sqf)) | (avdv3; ithb3)
-
-let locordwr = (avsg0; (ithb0 & ssg); vissg0) | (avwg0; (ithb0 & swg); viswg0) | (avqf0; (ithb0 & sqf); visqf0) | (avdv0; ithb0; visdv0) |
-               (avsg1; (ithb1 & ssg); vissg1) | (avwg1; (ithb1 & swg); viswg1) | (avqf1; (ithb1 & sqf); visqf1) | (avdv1; ithb1; visdv1) |
-               (avsg2; (ithb2 & ssg); vissg2) | (avwg2; (ithb2 & swg); viswg2) | (avqf2; (ithb2 & sqf); visqf2) | (avdv2; ithb2; visdv2) |
-               (avsg3; (ithb3 & ssg); vissg3) | (avwg3; (ithb3 & swg); viswg3) | (avqf3; (ithb3 & sqf); visqf3) | (avdv3; ithb3; visdv3)
-
-let locordd = loc & (
-    ((NONPRIV * NONPRIV) & po) |
-    ([R & NONPRIV]; (schbsc | schbsca); [(R | W) & NONPRIV]) |
-    vloc & (
-        ([W & NONPRIV]; locordww; [W & NONPRIV]) |
-        ([W & NONPRIV]; locordwr; [R & NONPRIV])
-    )
-)
+let locordd = loc & (NONPRIV * NONPRIV) & (
+    ([R]; (schbsc | schbsca); [R | W]) |
+    vloc & (po |
+        ((W * W) & ((ssg & avsghb) | (swg & avwghb) | (sqf & avqfhb) | avdvhb)) |
+        ((W * R) & ((ssg & (avsghb; vissg)) | (swg & (avwghb; viswg)) | (sqf & (avqfhb; visqf)) | (avdvhb; visdv)))
+    ))
 
 let locord = locordh | (locordh?; locordp) | (locordh?; ((W * W) & locordd)*; locordd)
 
