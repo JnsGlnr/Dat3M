@@ -200,7 +200,7 @@ let locordh = loc & (
     ([W]; schb; [AVDEVICE]; hbsc; [W]) |
     ([W]; schb; [AVDEVICE]; hb; [VISDEVICE]; hbsc; [R]))
 
-let locordp = vloc & int & (po | schbsc) // TODO: Is schbsc really needed here?
+let locordp = vloc & po
 
 let locordd = loc & (NONPRIV * NONPRIV) & (
     ([R]; (schbsc | schbsca); [R | W]) |
@@ -214,6 +214,9 @@ let locord = locordh | (locordh?; locordp) | (locordh?; ((W * W) & locordd)*; lo
 (***********************)
 (* Memory Model Axioms *)
 (***********************)
+
+// each ithb instance should be irreflexive
+irreflexive schbsc
 
 // consistent communication
 acyclic (locord | (mutordatom & (co | rf | fr))) as consistency-cycle
