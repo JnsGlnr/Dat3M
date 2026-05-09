@@ -195,8 +195,8 @@ let locordp = vloc & po
 let locordd = loc & (NONPRIV * NONPRIV) & (
     ([R]; (schbsc | schbsca); [W]) |
     vloc & (asmo | (obs?; po) |
-        ((W * W) & ((ssg & (obssg; hbsc)) | (swg & (obswg; hbsc)) | (sqf & (obsqf; hbsc)) | (obsdv; hbsc))) |
-        ((W * R) & ((ssg & (obssg; vissg)) | (swg & (obswg; viswg)) | (sqf & (obsqf; visqf)) | (obsdv; visdv))) |
+        ((W * W) & ((ssg & ([SG]; obs; hbsc)) | (swg & ([WG]; obs; hbsc)) | (sqf & ([QF]; obs; hbsc)) | ([DV]; obs; hbsc))) |
+        ((W * R) & ((ssg & ([SG]; obs; schb?; vissg)) | (swg & ([WG]; obs; schb?; viswg)) | (sqf & ([QF]; obs; schb?; visqf)) | ([DV]; obs; schb?; visdv))) |
         ((W * W) & ((ssg & avsghb) | (swg & avwghb) | (sqf & avqfhb) | avdvhb)) |
         ((W * R) & ((ssg & (avsghb; vissg)) | (swg & (avwghb; viswg)) | (sqf & (avqfhb; visqf)) | (avdvhb; visdv)))
     ))
