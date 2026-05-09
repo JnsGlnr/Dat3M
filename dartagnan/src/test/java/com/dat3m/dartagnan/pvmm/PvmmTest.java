@@ -180,6 +180,8 @@ public class PvmmTest {
                 String programPath = getRootPath("litmus/VULKAN/pvmm/" + programEntry.getKey() + ".litmus");
                 System.out.println(programPath);
                 for (Map.Entry<String, Result> resultEntry : programEntry.getValue().entrySet()) {
+                    String modelPath = getRootPath("cat/" + resultEntry.getKey() + ".cat");
+                    System.out.println(modelPath);
                     mkLogRelationsTask(programPath, typeEntry.getKey(), resultEntry.getKey(), resultEntry.getValue(), true);
                 }
             }
@@ -214,6 +216,10 @@ public class PvmmTest {
             Axiom irreflexiveLocord = removeAxiom(mcm, "irreflexive-locord");
             if (irreflexiveLocord != null) {
                 mcm.addConstraint(new Emptiness(irreflexiveLocord.getRelation(), true, true));
+            }
+            Axiom irreflexiveIthb = removeAxiom(mcm, "consistent-ithb");
+            if (irreflexiveIthb != null) {
+                mcm.addConstraint(new Emptiness(irreflexiveIthb.getRelation(), true, true));
             }
             program.setFilterSpecification(program.getSpecification());
             property = CAT_SPEC;

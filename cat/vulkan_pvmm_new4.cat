@@ -200,7 +200,7 @@ let locord = locordh | (locordh?; locordp) | (locordh?; ((W * W) & locordd)*; lo
 (***********************)
 
 // each ithb instance should be irreflexive
-irreflexive schbsc
+irreflexive schbsc as consistent-ithb
 
 // consistent communication
 acyclic (locord | (mutordatom & (co | rf | fr))) as consistency-cycle
