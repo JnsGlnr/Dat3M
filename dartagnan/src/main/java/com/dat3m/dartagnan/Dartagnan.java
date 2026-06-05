@@ -25,7 +25,7 @@ import org.sosy_lab.common.configuration.InvalidConfigurationException;
 import org.sosy_lab.common.configuration.Options;
 
 import java.io.File;
-import java.io.FileReader;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +39,7 @@ import java.util.stream.Stream;
 import static com.dat3m.dartagnan.configuration.OptionNames.TARGET;
 import static com.dat3m.dartagnan.utils.ExitCode.NORMAL_TERMINATION;
 import static com.dat3m.dartagnan.utils.GitInfo.*;
+import static com.dat3m.dartagnan.GlobalSettings.getHomeDirectory;
 
 @Options
 public class Dartagnan extends BaseOptions {
@@ -82,7 +83,7 @@ public class Dartagnan extends BaseOptions {
                     p.setEntrypoint(new Entrypoint.Simple(p.getFunctionByName(o.getEntryFunction()).orElseThrow(
                             () -> new MalformedProgramException(String.format("Program has no function named %s. Select a different entry point.", o.getEntryFunction())))));
                 }
-                final Wmm mcm = new ParserCat(Path.of(o.getCatIncludePath())).parse(catFile);
+                final Wmm mcm = new ParserCat(o.getCatIncludePath()).parse(catFile);
                 final VerificationTaskBuilder builder = VerificationTask.builder()
                         .withConfig(config)
                         .withProgressModel(o.getProgressModel());
@@ -122,11 +123,13 @@ public class Dartagnan extends BaseOptions {
 
     private static void printVersion() throws Exception {
         final MavenXpp3Reader mvnReader = new MavenXpp3Reader();
-        final FileReader fileReader = new FileReader(System.getenv("DAT3M_HOME") + "/pom.xml");
-        final String base = mvnReader.read(fileReader).getVersion();
-        final String version = base.equals(getGitTags()) ? base : String.format("%s (commit %s)", base, getGitId());
+        final Path pomPath = getHomeDirectory().resolve("pom.xml");
 
-        System.out.println(version);
+        try (BufferedReader reader = Files.newBufferedReader(pomPath)) {
+            final String base = mvnReader.read(reader).getVersion();
+            final String version = base.equals(getGitTags()) ? base : String.format("%s (commit %s)", base, getGitId());
+            System.out.println(version);
+        }
     }
 
     private static Configuration loadConfigurationFromArgs(String[] args) throws InvalidConfigurationException, IOException {
