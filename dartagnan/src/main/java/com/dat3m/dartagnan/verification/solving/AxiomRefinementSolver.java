@@ -18,7 +18,6 @@ import com.dat3m.dartagnan.verification.model.EventData;
 import com.dat3m.dartagnan.wmm.Constraint;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.Wmm;
-import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
 import com.dat3m.dartagnan.wmm.definition.*;
 import com.google.common.collect.Iterables;
@@ -166,7 +165,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
         final SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
 
         final BooleanFormulaManager bmgr = ctx.getFormulaManager().getBooleanFormulaManager();
-        final EazyWMMSolver solver = EazyWMMSolver.withContext(context, analysisContext.requires(RelationAnalysis.class), eazyConstraints);
+        final EazyWMMSolver solver = EazyWMMSolver.withContext(context, eazyConstraints);
         final EazyRefiner refiner = EazyRefiner.newInstance();
         final Property.Type propertyType = Property.getCombinedType(task.getProperty(), task);
 
