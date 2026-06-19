@@ -3,21 +3,13 @@ package com.dat3m.dartagnan.solver.caat4wmm;
 
 import com.dat3m.dartagnan.encoding.EncodingContext;
 import com.dat3m.dartagnan.encoding.IREvaluator;
-import com.dat3m.dartagnan.program.event.Event;
 import com.dat3m.dartagnan.solver.caat.CAATSolver;
 import com.dat3m.dartagnan.solver.caat.constraints.AcyclicityConstraint;
 import com.dat3m.dartagnan.solver.caat.constraints.Constraint;
-import com.dat3m.dartagnan.solver.caat.predicates.relationGraphs.Edge;
-import com.dat3m.dartagnan.solver.caat.reasoning.CAATImplication;
-import com.dat3m.dartagnan.solver.caat.reasoning.EdgeLiteral;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreImplication;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreLiteral;
-import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.RelLiteral;
 import com.dat3m.dartagnan.utils.logic.Conjunction;
 import com.dat3m.dartagnan.utils.logic.DNF;
-import com.dat3m.dartagnan.wmm.Relation;
-import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
-import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
 
 import java.util.*;
@@ -27,17 +19,14 @@ import java.util.*;
 */
 public class EazyWMMSolver extends WMMSolver {
 
-    private final RelationAnalysis relationAnalysis;
-
-    private EazyWMMSolver(EncodingContext c, RelationAnalysis relationAnalysis, Collection<? extends com.dat3m.dartagnan.wmm.Constraint> eazyConstraints)
+    private EazyWMMSolver(EncodingContext c, Collection<? extends com.dat3m.dartagnan.wmm.Constraint> eazyConstraints)
             throws InvalidConfigurationException {
         super(c, new ExecutionGraph(c.getTask().getMemoryModel(), constraint -> c.isEncoded(constraint) && !eazyConstraints.contains(constraint)));
-        this.relationAnalysis = relationAnalysis;
     }
 
-    public static EazyWMMSolver withContext(EncodingContext context, RelationAnalysis relationAnalysis, Collection<? extends com.dat3m.dartagnan.wmm.Constraint> eazyConstraints)
+    public static EazyWMMSolver withContext(EncodingContext context, Collection<? extends com.dat3m.dartagnan.wmm.Constraint> eazyConstraints)
             throws InvalidConfigurationException {
-        return new EazyWMMSolver(context, relationAnalysis, eazyConstraints);
+        return new EazyWMMSolver(context, eazyConstraints);
     }
 
     public Result check(IREvaluator model) {
@@ -67,24 +56,8 @@ public class EazyWMMSolver extends WMMSolver {
 
             // ============== Compute Core implications ==============
             curTime = System.currentTimeMillis();
-            final EventDomain domain = executionGraph.getDomain();
-            final List<CoreImplication> implications = new ArrayList<>();
-            for (CAATImplication baseImplication : solver.computeInconsistencyImplications(eazyConstraints).getLiterals()) {
-                final EdgeLiteral impliedBaseLiteral = (EdgeLiteral) baseImplication.getImpliedLiteral();
-                final Relation rel = executionGraph.getRelation(impliedBaseLiteral.getPredicate());
-                final EventGraph mustSet = relationAnalysis.getKnowledge(rel).getMustSet();
-                final Edge impliedEdge = impliedBaseLiteral.getData();
-                final Event firstEvent = domain.getObjectById(impliedEdge.getFirst()).getEvent();
-                final Event secondEvent = domain.getObjectById(impliedEdge.getSecond()).getEvent();
-                if (!mustSet.contains(firstEvent, secondEvent)) {
-                    final RelLiteral impliedCoreLiteral = new RelLiteral(rel, firstEvent, secondEvent, true);
-                    for (Conjunction<CoreLiteral> reason : reasoner.toCoreReasons(baseImplication.getReason())) {
-                        implications.add(new CoreImplication(reason, impliedCoreLiteral));
-                    }
-                }
-            }
-            stats.numComputedCoreImplications = implications.size();
-            result.coreImplications = new Conjunction<>(implications);
+            result.coreImplications = reasoner.toCoreImplications(solver.computeInconsistencyImplications(eazyConstraints));
+            stats.numComputedCoreImplications = result.coreImplications.getSize();
             stats.coreImplicationComputationTime = System.currentTimeMillis() - curTime;
 
             // ============== Compute Core reasons ==============
