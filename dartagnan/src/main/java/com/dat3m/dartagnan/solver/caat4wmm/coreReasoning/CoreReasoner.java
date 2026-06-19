@@ -4,6 +4,7 @@ import com.dat3m.dartagnan.program.Thread;
 import com.dat3m.dartagnan.program.analysis.ExecutionAnalysis;
 import com.dat3m.dartagnan.program.analysis.ThreadSymmetry;
 import com.dat3m.dartagnan.program.event.Event;
+import com.dat3m.dartagnan.solver.caat.reasoning.CAATImplication;
 import com.dat3m.dartagnan.solver.caat.reasoning.CAATLiteral;
 import com.dat3m.dartagnan.solver.caat.reasoning.EdgeLiteral;
 import com.dat3m.dartagnan.solver.caat.reasoning.ElementLiteral;
@@ -16,6 +17,7 @@ import com.dat3m.dartagnan.verification.Context;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.definition.TagSet;
+import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import org.sosy_lab.common.configuration.Option;
@@ -132,6 +134,57 @@ public class CoreReasoner {
         return orbit.stream().map(this::reduce).filter(Objects::nonNull).map(Conjunction::new).collect(Collectors.toSet());
     }
 
+    public Conjunction<CoreImplication> toCoreImplications(Conjunction<CAATImplication> baseImplications) {
+        final List<CoreImplication> implications = new ArrayList<>();
+        for (CAATImplication baseImplication : baseImplications.getLiterals()) {
+            implications.addAll(toCoreImplications(baseImplication.getReason(), baseImplication.getImpliedLiteral()));
+        }
+        return new Conjunction<>(implications);
+    }
+
+    private record CoreImplicationInternal(List<CoreLiteral> literals, CoreLiteral implied) {
+    }
+
+    public Collection<CoreImplication> toCoreImplications(Conjunction<CAATLiteral> baseReason, CAATLiteral implied) {
+        final EventDomain domain = executionGraph.getDomain();
+
+        final CoreLiteral impliedCoreLit = toUnreducedCoreLiteral(implied, domain);
+        if (impliedCoreLit instanceof RelLiteral impliedRelLiteral) {
+            final EventGraph mustSet = ra.getKnowledge(impliedRelLiteral.getRelation()).getMustSet();
+            if (mustSet.contains(impliedRelLiteral.getSource(), impliedRelLiteral.getTarget())) {
+                // If the implied literal is already known to be true, we can skip computing implications for it.
+                return Collections.emptySet();
+            }
+        }
+
+        // We compute the orbit of <baseReason> under the symmetry group of the program's threads.
+        // We use a standard worklist algorithm to do so.
+        // NOTE: We compute the orbit of an "unreduced" core reason, because
+        // reductions we can apply to a core reason may not be sound for its symmetric counterparts.
+        final Set<CoreImplicationInternal> orbit = new HashSet<>();
+        final Deque<CoreImplicationInternal> workqueue = new ArrayDeque<>();
+        workqueue.add(new CoreImplicationInternal(toUnreducedCoreReason(baseReason, domain), impliedCoreLit));
+        while (!workqueue.isEmpty()) {
+            final CoreImplicationInternal implication = workqueue.removeFirst();
+            for (Function<Event, Event> generator : symmGenerators) {
+                final CoreImplicationInternal permuted = new CoreImplicationInternal(getPermuted(implication.literals, generator), getPermuted(implication.implied, generator));
+                if (orbit.add(permuted)) {
+                    workqueue.add(permuted);
+                }
+            }
+        }
+
+        // Now we can reduce all computed (symmetric) reasons.
+        final Collection<CoreImplication> result = new ArrayList<>(orbit.size());
+        for (final CoreImplicationInternal implication : orbit) {
+            final List<CoreLiteral> reduced = reduce(implication.literals);
+            if (reduced != null) {
+                result.add(new CoreImplication(new Conjunction<>(reduced), implication.implied));
+            }
+        }
+        return result;
+    }
+
     private Conjunction<CoreLiteral> toCoreReasonNoSymmetry(Conjunction<CAATLiteral> baseReason) {
         List<CoreLiteral> reduced = reduce(toUnreducedCoreReason(baseReason, executionGraph.getDomain()));
         return reduced == null ? Conjunction.FALSE() : new Conjunction<>(reduced);
@@ -141,41 +194,50 @@ public class CoreReasoner {
         final List<CoreLiteral> permuted = new ArrayList<>(reason.size());
 
         for (CoreLiteral lit : reason) {
-            if (lit instanceof ExecLiteral execLiteral) {
-                final Event e = perm.apply(execLiteral.getEvent());
-                permuted.add(new ExecLiteral(e, execLiteral.isPositive()));
-            } else if (lit instanceof RelLiteral relLiteral) {
-                final Event e1 = perm.apply(relLiteral.getSource());
-                final Event e2 = perm.apply(relLiteral.getTarget());
-                permuted.add(new RelLiteral(relLiteral.getRelation(), e1, e2, relLiteral.isPositive()));
-            } else {
-                assert false : "Unexpected core literal type: violated invariant.";
-            }
+            permuted.add(getPermuted(lit, perm));
         }
         return permuted;
+    }
+
+    private CoreLiteral getPermuted(CoreLiteral lit, Function<Event, Event> perm) {
+        if (lit instanceof ExecLiteral execLiteral) {
+            final Event e = perm.apply(execLiteral.getEvent());
+            return new ExecLiteral(e, execLiteral.isPositive());
+        } else if (lit instanceof RelLiteral relLiteral) {
+            final Event e1 = perm.apply(relLiteral.getSource());
+            final Event e2 = perm.apply(relLiteral.getTarget());
+            return new RelLiteral(relLiteral.getRelation(), e1, e2, relLiteral.isPositive());
+        } else {
+            assert false : "Unexpected core literal type: violated invariant.";
+            return null;
+        }
     }
 
     // An "unreduced" core reason is a faithful (invertible) translation of a base relation to a core reason.
     private List<CoreLiteral> toUnreducedCoreReason(Conjunction<CAATLiteral> baseReason, EventDomain domain) {
         final List<CoreLiteral> coreReason = new ArrayList<>(baseReason.getSize());
         for (CAATLiteral lit : baseReason.getLiterals()) {
-            final Relation rel = executionGraph.getRelation(lit.getPredicate());
-            if (lit instanceof ElementLiteral eleLit) {
-                final Event e = domain.getObjectById(eleLit.getData().getId()).getEvent();
-                final CoreLiteral coreLiteral;
-                if (rel.getDefinition() instanceof TagSet) {
-                    coreLiteral = new ExecLiteral(e, true);
-                } else {
-                    coreLiteral = new RelLiteral(rel, e, e, eleLit.isPositive());
-                }
-                coreReason.add(coreLiteral);
-            } else if (lit instanceof EdgeLiteral edgeLit) {
-                final Event e1 = domain.getObjectById(edgeLit.getData().getFirst()).getEvent();
-                final Event e2 = domain.getObjectById(edgeLit.getData().getSecond()).getEvent();
-                coreReason.add(new RelLiteral(rel, e1, e2, edgeLit.isPositive()));
-            }
+            coreReason.add(toUnreducedCoreLiteral(lit, domain));
         }
         return coreReason;
+    }
+
+    private CoreLiteral toUnreducedCoreLiteral(CAATLiteral lit, EventDomain domain) {
+        final Relation rel = executionGraph.getRelation(lit.getPredicate());
+        if (lit instanceof ElementLiteral eleLit) {
+            final Event e = domain.getObjectById(eleLit.getData().getId()).getEvent();
+            if (rel.getDefinition() instanceof TagSet) {
+                return new ExecLiteral(e, true);
+            } else {
+                return new RelLiteral(rel, e, e, eleLit.isPositive());
+            }
+        } else if (lit instanceof EdgeLiteral edgeLit) {
+            final Event e1 = domain.getObjectById(edgeLit.getData().getFirst()).getEvent();
+            final Event e2 = domain.getObjectById(edgeLit.getData().getSecond()).getEvent();
+            return new RelLiteral(rel, e1, e2, edgeLit.isPositive());
+        } else {
+            throw new UnsupportedOperationException("Unexpected core literal type: " + lit.getClass().getSimpleName());
+        }
     }
 
     // Reduce a core reason by applying knowledge about the semantics of its literals
