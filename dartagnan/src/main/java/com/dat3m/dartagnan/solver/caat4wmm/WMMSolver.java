@@ -18,13 +18,17 @@ import java.util.Set;
 */
 public class WMMSolver {
 
-    private final ExecutionGraph executionGraph;
-    private final ExecutionModel executionModel;
-    private final CAATSolver solver;
-    private final CoreReasoner reasoner;
+    protected final ExecutionGraph executionGraph;
+    protected final ExecutionModel executionModel;
+    protected final CAATSolver solver;
+    protected final CoreReasoner reasoner;
 
-    private WMMSolver(EncodingContext c) throws InvalidConfigurationException {
-        this.executionGraph = new ExecutionGraph(c.getTask().getMemoryModel(), c::isEncoded);
+    WMMSolver(EncodingContext c) throws InvalidConfigurationException {
+        this(c, new ExecutionGraph(c.getTask().getMemoryModel(), c::isEncoded));
+    }
+
+    WMMSolver(EncodingContext c, ExecutionGraph graph) throws InvalidConfigurationException {
+        this.executionGraph = graph;
         this.executionModel = ExecutionModel.withContext(c);
         this.reasoner = new CoreReasoner(c.getAnalysisContext(), executionGraph, c.getTask().getConfig());
         this.solver = CAATSolver.create();
@@ -73,9 +77,9 @@ public class WMMSolver {
     // ===================== Classes ======================
 
     public static class Result {
-        private CAATSolver.Status status;
-        private DNF<CoreLiteral> coreReasons;
-        private Statistics stats;
+        protected CAATSolver.Status status;
+        protected DNF<CoreLiteral> coreReasons;
+        protected Statistics stats;
 
         public CAATSolver.Status getStatus() { return status; }
         public DNF<CoreLiteral> getCoreReasons() { return coreReasons; }

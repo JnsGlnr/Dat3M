@@ -154,6 +154,11 @@ public abstract class AbstractLitmusTest {
         testSolver(Method.LAZY);
     }
 
+    @Test
+    public void testAxiomRefinement() throws Exception {
+        testSolver(Method.EAZY);
+    }
+
     protected void testSolver(Method method) throws Exception {
         try (TaskSolver solver = TaskSolver.createWithMethod(taskProvider.get(), method)
                 .withShutdownManager(shutdownManagerProvider.get())) {

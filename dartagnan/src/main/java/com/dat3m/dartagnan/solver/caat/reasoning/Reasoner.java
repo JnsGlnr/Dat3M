@@ -64,6 +64,56 @@ public class Reasoner {
         return new DNF<>(reasonList);
     }
 
+    public Conjunction<CAATImplication> computeViolationImplications(Constraint constraint) {
+        if (!constraint.checkForViolations()) {
+            return Conjunction.FALSE();
+        }
+
+        CAATPredicate pred = constraint.getConstrainedPredicate();
+        Collection<? extends Collection<? extends Derivable>> violations = constraint.getViolations();
+        List<CAATImplication> reasonList = new ArrayList<>();
+
+        if (constraint instanceof AcyclicityConstraint) {
+            // For acyclicity constraints, it is likely that we encounter the same
+            // edge multiple times (as it can be part of different cycles)
+            // so we memoize the computed reasons and reuse them if possible.
+            final RelationGraph constrainedGraph = (RelationGraph) pred;
+            final int mapSize = violations.stream().mapToInt(Collection::size).sum() * 4 / 3;
+            final Map<Edge, CAATImplication> reasonMap = new HashMap<>(mapSize);
+
+            for (Collection<Edge> violation : (Collection<Collection<Edge>>)violations) {
+                for (Edge edge : violation) {
+                    reasonMap.computeIfAbsent(edge, key -> {
+                        final CAATImplication implication = new CAATImplication(computeReason(constrainedGraph, key),
+                                new EdgeLiteral(constrainedGraph, key, true));
+                        reasonList.add(implication);
+                        return implication;
+                    });
+                }
+            }
+        } else {
+            for (Collection<? extends Derivable> violation : violations) {
+                for (Derivable derivable : violation) {
+                    reasonList.add(new CAATImplication(computeReason(pred, derivable), getCAATLiteral(derivable, pred)));
+                }
+            }
+        }
+
+        return new Conjunction<>(reasonList);
+    }
+
+    public static CAATLiteral getCAATLiteral(Derivable derivable, CAATPredicate pred) {
+        final CAATLiteral caatLiteral;
+        if (derivable instanceof Edge edge) {
+            caatLiteral = new EdgeLiteral((RelationGraph) pred, edge, true);
+        } else if (derivable instanceof Element element) {
+            caatLiteral = new ElementLiteral((SetPredicate) pred, element, true);
+        } else {
+            throw new UnsupportedOperationException("Unsupported derivable type: " + derivable.getClass().getSimpleName());
+        }
+        return caatLiteral;
+    }
+
     public Conjunction<CAATLiteral> computeReason(CAATPredicate pred, Derivable prop) {
         if (pred instanceof RelationGraph rg && prop instanceof Edge edge) {
             return computeReason(rg, edge);
