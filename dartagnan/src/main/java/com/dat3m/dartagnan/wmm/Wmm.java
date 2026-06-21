@@ -161,6 +161,12 @@ public class Wmm {
                 && rel.getDependencies().stream().allMatch(this::isInternal));
     }
 
+    public static Collection<? extends Constraint> computeConstraintDependencies(Constraint c) {
+        final List<? extends Relation> rels = c.getConstrainedRelations();
+        final List<? extends Relation> deps = c instanceof Definition ? rels.subList(1, rels.size()) : rels;
+        return deps.stream().map(Relation::getDefinition).toList();
+    }
+
     // ========================================== Utility Methods ========================================
 
     private Relation makePredefinedRelation(String name) {

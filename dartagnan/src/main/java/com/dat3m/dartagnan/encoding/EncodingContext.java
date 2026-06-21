@@ -91,7 +91,7 @@ public final class EncodingContext {
                 .toList();
         final Iterable<? extends Constraint> toEncode = Iterables.concat(c, anarchicConstraints);
         constraintsToEncode = new LinkedHashSet<>(
-                DependencyGraph.from(toEncode, EncodingContext::computeConstraintDependencies).getNodeContents()
+                DependencyGraph.from(toEncode, Wmm::computeConstraintDependencies).getNodeContents()
         );
     }
 
@@ -293,12 +293,6 @@ public final class EncodingContext {
 
     // ====================================================================================
     // Private implementation
-
-    private static Collection<? extends Constraint> computeConstraintDependencies(Constraint c) {
-        final List<? extends Relation> rels = c.getConstrainedRelations();
-        final List<? extends Relation> deps = c instanceof Definition ? rels.subList(1, rels.size()) : rels;
-        return deps.stream().map(Relation::getDefinition).toList();
-    }
 
     private void initialize() {
         // ------- Control flow variables -------

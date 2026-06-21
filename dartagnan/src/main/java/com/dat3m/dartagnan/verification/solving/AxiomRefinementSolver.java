@@ -10,16 +10,21 @@ import com.dat3m.dartagnan.solver.caat4wmm.EazyRefiner;
 import com.dat3m.dartagnan.solver.caat4wmm.EazyWMMSolver;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreImplication;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreLiteral;
+import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.TrivialImplications;
 import com.dat3m.dartagnan.utils.logic.Conjunction;
 import com.dat3m.dartagnan.utils.logic.DNF;
 import com.dat3m.dartagnan.verification.Context;
 import com.dat3m.dartagnan.verification.VerificationTask;
 import com.dat3m.dartagnan.verification.model.EventData;
 import com.dat3m.dartagnan.wmm.Constraint;
+import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.Wmm;
+import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
+import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.definition.*;
+import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
@@ -159,13 +164,14 @@ public class AxiomRefinementSolver extends RefinementSolver {
         final ProverWithTracker prover = this.prover;
 
         context = EncodingContext.of(task, analysisContext, ctx.getFormulaManager(), wmmConstraintsToEncode);
+        final TrivialImplications trivialImplications = getTrivialImplications(eazyConstraints);
         final ProgramEncoder programEncoder = ProgramEncoder.withContext(context);
         final WmmEncoder baselineEncoder = WmmEncoder.withContext(context);
         final PropertyEncoder propertyEncoder = PropertyEncoder.withContext(context, baselineEncoder);
         final SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
 
         final BooleanFormulaManager bmgr = ctx.getFormulaManager().getBooleanFormulaManager();
-        final EazyWMMSolver solver = EazyWMMSolver.withContext(context, eazyConstraints);
+        final EazyWMMSolver solver = EazyWMMSolver.withContext(context, trivialImplications);
         final EazyRefiner refiner = EazyRefiner.newInstance();
         final Property.Type propertyType = Property.getCombinedType(task.getProperty(), task);
 
@@ -174,6 +180,8 @@ public class AxiomRefinementSolver extends RefinementSolver {
         prover.addConstraint(programEncoder.encodeFullProgram());
         prover.writeComment("Memory model (baseline) encoding");
         prover.addConstraint(baselineEncoder.encodeFullMemoryModel());
+        prover.writeComment("Trivial implications from base relations to axioms");
+        prover.addConstraint(trivialImplications.encode(context));
         prover.writeComment("Symmetry breaking encoding");
         prover.addConstraint(symmetryEncoder.encodeFullSymmetryBreaking());
         // Bounds
@@ -381,6 +389,48 @@ public class AxiomRefinementSolver extends RefinementSolver {
                 smtStatus, nativeTime, caatTime, refineTime, caatStatus,
                 refinementFormula, caatStats, inconsistencyReasons, inconsistencyImplications, observedEvents
         );
+    }
+
+    private TrivialImplications getTrivialImplications(Collection<? extends Constraint> eazyConstraints) {
+        final RelationAnalysis ra = context.getAnalysisContext().requires(RelationAnalysis.class);
+        final Map<Relation, Map<Relation, Map<Event, List<Event>>>> result = new HashMap<>();
+        for (Constraint eazyConstraint : eazyConstraints) {
+            final Map<Relation, Map<Event, List<Event>>> trivialImplications = new HashMap<>();
+            if (eazyConstraint instanceof Axiom eazyAxiom) {
+                eazyConstraint = eazyAxiom.getRelation().getDefinition();
+            }
+            final Definition eazyDef = (Definition) eazyConstraint;
+            final Relation eazyRel = eazyDef.getDefinedRelation();
+            final EventGraph must = ra.getKnowledge(eazyRel).getMustSet();
+
+            final List<Constraint> foundConstraints = new ArrayList<>();
+            final Deque<Constraint> visited = new ArrayDeque<>();
+            visited.add(eazyConstraint);
+            while (!visited.isEmpty()) {
+                final Constraint constraint = visited.pop();
+                if (context.isEncoded(constraint)) {
+                    if (!foundConstraints.contains(constraint)) {
+                        final Definition def = (Definition) constraint;
+                        final Relation rel = def.getDefinedRelation();
+                        final Map<Event, List<Event>> events = new HashMap<>();
+                        ra.getKnowledge(rel).getMaySet().apply((e1, e2) -> {
+                            if (!must.contains(e1, e2)) {
+                                events.computeIfAbsent(e1, k -> new ArrayList<>()).add(e2);
+                            }
+                        });
+                        trivialImplications.put(rel, events);
+                        foundConstraints.add(constraint);
+                    }
+                } else if (constraint instanceof Union || constraint instanceof SetIdentity
+                        || constraint instanceof TransitiveClosure) {
+                    for (Constraint dep : Wmm.computeConstraintDependencies(constraint)) {
+                        visited.push(dep);
+                    }
+                }
+            }
+            result.put(eazyRel, trivialImplications);
+        }
+        return new TrivialImplications(result);
     }
 
     // ================================================================================================================
