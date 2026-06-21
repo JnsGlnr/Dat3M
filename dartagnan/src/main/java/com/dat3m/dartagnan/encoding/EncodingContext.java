@@ -90,7 +90,7 @@ public final class EncodingContext {
                 .map(n -> t.getMemoryModel().getRelation(n).getDefinition())
                 .toList();
         final Iterable<? extends Constraint> toEncode = Iterables.concat(c, anarchicConstraints);
-        var depGraph = DependencyGraph.from(toEncode, EncodingContext::computeConstraintDependencies);
+        var depGraph = DependencyGraph.from(toEncode, Wmm::computeConstraintDependencies);
         // NOTE: This guarantees a deterministic ordering of the constraints to be encoded
         constraintsToEncode = t.getMemoryModel().getConstraints().stream()
                 .filter(depGraph::contains)
@@ -297,12 +297,6 @@ public final class EncodingContext {
 
     // ====================================================================================
     // Private implementation
-
-    private static Collection<? extends Constraint> computeConstraintDependencies(Constraint c) {
-        final List<? extends Relation> rels = c.getConstrainedRelations();
-        final List<? extends Relation> deps = c instanceof Definition ? rels.subList(1, rels.size()) : rels;
-        return deps.stream().map(Relation::getDefinition).toList();
-    }
 
     private void initialize() {
         // ------- Control flow variables -------

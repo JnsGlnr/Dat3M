@@ -134,10 +134,11 @@ public class CoreReasoner {
         return orbit.stream().map(this::reduce).filter(Objects::nonNull).map(Conjunction::new).collect(Collectors.toSet());
     }
 
-    public Conjunction<CoreImplication> toCoreImplications(Conjunction<CAATImplication> baseImplications) {
+    public Conjunction<CoreImplication> toCoreImplications(Conjunction<CAATImplication> baseImplications,
+                                                           TrivialImplications trivialImplications) {
         final List<CoreImplication> implications = new ArrayList<>();
         for (CAATImplication baseImplication : baseImplications.getLiterals()) {
-            implications.addAll(toCoreImplications(baseImplication.getReason(), baseImplication.getImpliedLiteral()));
+            implications.addAll(toCoreImplications(baseImplication.getReason(), baseImplication.getImpliedLiteral(), trivialImplications));
         }
         return new Conjunction<>(implications);
     }
@@ -145,15 +146,39 @@ public class CoreReasoner {
     private record CoreImplicationInternal(List<CoreLiteral> literals, CoreLiteral implied) {
     }
 
-    public Collection<CoreImplication> toCoreImplications(Conjunction<CAATLiteral> baseReason, CAATLiteral implied) {
+    public Collection<CoreImplication> toCoreImplications(Conjunction<CAATLiteral> baseReason, CAATLiteral implied,
+                                                          TrivialImplications trivialImplications) {
         final EventDomain domain = executionGraph.getDomain();
 
         final CoreLiteral impliedCoreLit = toUnreducedCoreLiteral(implied, domain);
-        if (impliedCoreLit instanceof RelLiteral impliedRelLiteral) {
-            final EventGraph mustSet = ra.getKnowledge(impliedRelLiteral.getRelation()).getMustSet();
-            if (mustSet.contains(impliedRelLiteral.getSource(), impliedRelLiteral.getTarget())) {
-                // If the implied literal is already known to be true, we can skip computing implications for it.
-                return Collections.emptySet();
+        final Relation impliedRelation = executionGraph.getRelation(implied.getPredicate());
+        final EventGraph mustSet = ra.getKnowledge(impliedRelation).getMustSet();
+        // If the implied literal is already known to be true, we can skip computing implications for it.
+        if (impliedCoreLit instanceof RelLiteral impliedRelLiteral
+                && mustSet.contains(impliedRelLiteral.getSource(), impliedRelLiteral.getTarget())) {
+            return Collections.emptySet();
+        } else if (impliedCoreLit instanceof ExecLiteral impliedExecLiteral
+                && mustSet.contains(impliedExecLiteral.getEvent(), impliedExecLiteral.getEvent())) {
+            return Collections.emptySet();
+        }
+
+        if (baseReason.getSize() == 1) {
+            final CAATLiteral reason = baseReason.getLiterals().iterator().next();
+            if (reason.getData().equals(implied.getData())) {
+                if (impliedCoreLit instanceof RelLiteral impliedRelLiteral) {
+                    final Event first = impliedRelLiteral.getSource();
+                    final Event second = impliedRelLiteral.getTarget();
+                    if (trivialImplications.isTrivial(executionGraph.getRelation(reason.getPredicate()),
+                            impliedRelation, first, second)) {
+                        return Collections.emptySet();
+                    }
+                } else if (impliedCoreLit instanceof ExecLiteral impliedExecLiteral) {
+                    final Event event = impliedExecLiteral.getEvent();
+                    if (trivialImplications.isTrivial(executionGraph.getRelation(reason.getPredicate()),
+                            impliedRelation, event)) {
+                        return Collections.emptySet();
+                    }
+                }
             }
         }
 
@@ -179,7 +204,20 @@ public class CoreReasoner {
         for (final CoreImplicationInternal implication : orbit) {
             final List<CoreLiteral> reduced = reduce(implication.literals);
             if (reduced != null) {
-                result.add(new CoreImplication(new Conjunction<>(reduced), implication.implied));
+                boolean isTrivial = false;
+                if (reduced.size() == 1 && reduced.get(0) instanceof RelLiteral relLiteral
+                        && implication.implied instanceof RelLiteral impliedRelLiteral
+                        && relLiteral.isPositive() && impliedRelLiteral.isPositive()) {
+                    final Event first = impliedRelLiteral.getSource();
+                    final Event second = impliedRelLiteral.getTarget();
+                    if (relLiteral.getSource() == first && relLiteral.getTarget() == second
+                            && trivialImplications.isTrivial(relLiteral.getRelation(), impliedRelLiteral.getRelation(), first, second)) {
+                        isTrivial = true;
+                    }
+                }
+                if (!isTrivial) {
+                    result.add(new CoreImplication(new Conjunction<>(reduced), implication.implied));
+                }
             }
         }
         return result;
