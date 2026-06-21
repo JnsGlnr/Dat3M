@@ -83,7 +83,7 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
     // ================================================================================================================
     // Data classes
 
-    private enum SMTStatus {
+    protected enum SMTStatus {
         SAT, UNSAT, UNKNOWN
     }
 
@@ -142,9 +142,9 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
 
     private EncodingContext context;
 
-    private RefinementSolver(VerificationTask task) throws InvalidConfigurationException {
+    RefinementSolver(VerificationTask task) throws InvalidConfigurationException {
         super(task);
-        task.getConfig().inject(this);
+        task.getConfig().inject(this, RefinementSolver.class);
     }
 
     public static RefinementSolver create(VerificationTask task) throws InvalidConfigurationException  {
@@ -269,9 +269,7 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
 
         logProverStatistics(logger, prover);
 
-        if (printCovReport) {
-            System.out.println(generateCoverageReport(combinedTrace.getObservedEvents(), task.getProgram(), analysisContext));
-        }
+        printCovReport(combinedTrace.getObservedEvents(), task.getProgram(), analysisContext);
 
         final IREvaluator model = smtStatus == SMTStatus.SAT ? context.newEvaluator(prover) : null;
         if (model != null) {
@@ -285,7 +283,7 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
         return new VerificationResult(this.task, res, model);
     }
 
-    private void validateModel(ExecutionModel model) {
+    protected void validateModel(ExecutionModel model) {
         // Check if there are accesses to uninitialized registers
         for (ExecutionModel.UninitRegRead uninitRegRead : model.getUninitRegReads()) {
             logger.warn("Encountered uninitialized register {} read by {}: {}.",
@@ -295,7 +293,7 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
         // TODO: Check if there is OOB or any aliasing violation
     }
 
-    private void analyzeInconclusiveness(Task task, Context analysisContext, ExecutionModel model) {
+    protected void analyzeInconclusiveness(Task task, Context analysisContext, ExecutionModel model) {
         final AliasAnalysis alias = analysisContext.get(AliasAnalysis.class);
         if (alias == null) {
             return;
@@ -397,7 +395,7 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
         return !last.inconsistencyReasons.equals(prev.inconsistencyReasons);
     }
 
-    private static boolean isUnknownDefinitionForCAAT(Definition def) {
+    protected static boolean isUnknownDefinitionForCAAT(Definition def) {
         // TODO: We should probably automatically cut all "unknown relation",
         //  i.e., use a white list of known relations instead of a black list of unknown one's.
         return def instanceof AMOPairs || def instanceof SameInstruction || def instanceof Free // Basic
@@ -460,7 +458,7 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
         );
     }
 
-    private static Set<Constraint> generateCut(Wmm model) {
+    protected static Set<Constraint> generateCut(Wmm model) {
         // We cut (i) negated axioms, (ii) negated relations (if derived),
         // and (iii) some special relations because they are derived from internal relations (like data/addr/ctrl)
         // or because we have no dedicated implementation for them in CAAT (like Linux' rscs).
@@ -488,7 +486,7 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
                 }
                 case Definition def when def.getDefinedRelation().hasName() -> {
                     // (iii) Special relations
-                    final String name = def.getDefinedRelation().getName().get();
+                    final String name = def.getDefinedRelation().getName().orElseThrow();
                     if (name.equals(DATA) || name.equals(CTRL) || name.equals(ADDR) || isUnknownDefinitionForCAAT(def)) {
                         constraintsToCut.add(c);
                     }
@@ -501,7 +499,7 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
 
 
     /*
-        The constraints/relations of the Wmm can be categorised into positive and negative,
+        The constraints/relations of the Wmm can be categorized into positive and negative,
         depending on whether the number of negations applied to the constraint/relation is even (=positive)
         or odd (=negative).
         Negations come from negated axioms (~empty(r)), RHS of differences (c = a \ b), or
@@ -702,6 +700,12 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
         }
 
         return message.toString();
+    }
+
+    protected void printCovReport(Set<Event> coveredEvents, Program program, Context analysisContext) {
+        if (printCovReport) {
+            System.out.println(generateCoverageReport(coveredEvents, program, analysisContext));
+        }
     }
 
     private static CharSequence generateCoverageReport(Set<Event> coveredEvents, Program program,

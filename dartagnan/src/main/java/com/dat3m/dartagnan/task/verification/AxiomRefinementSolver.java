@@ -2,90 +2,58 @@ package com.dat3m.dartagnan.task.verification;
 
 import com.dat3m.dartagnan.configuration.Property;
 import com.dat3m.dartagnan.encoding.*;
-import com.dat3m.dartagnan.program.Program;
-import com.dat3m.dartagnan.program.Thread;
-import com.dat3m.dartagnan.program.analysis.BranchEquivalence;
-import com.dat3m.dartagnan.program.analysis.SyntacticContextAnalysis;
-import com.dat3m.dartagnan.program.analysis.ThreadSymmetry;
-import com.dat3m.dartagnan.program.analysis.alias.AliasAnalysis;
 import com.dat3m.dartagnan.program.event.Event;
-import com.dat3m.dartagnan.program.event.MemoryEvent;
-import com.dat3m.dartagnan.program.event.core.MemoryCoreEvent;
-import com.dat3m.dartagnan.metadata.SourceLocation;
 import com.dat3m.dartagnan.smt.ProverWithTracker;
-import com.dat3m.dartagnan.task.SMTModelChecker;
 import com.dat3m.dartagnan.solver.caat.CAATSolver;
-import com.dat3m.dartagnan.solver.caat4wmm.Refiner;
-import com.dat3m.dartagnan.solver.caat4wmm.WMMSolver;
+import com.dat3m.dartagnan.solver.caat4wmm.EazyRefiner;
+import com.dat3m.dartagnan.solver.caat4wmm.EazyWMMSolver;
+import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreImplication;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreLiteral;
-import com.dat3m.dartagnan.utils.equivalence.EquivalenceClass;
 import com.dat3m.dartagnan.utils.logic.Conjunction;
 import com.dat3m.dartagnan.utils.logic.DNF;
 import com.dat3m.dartagnan.task.*;
 import com.dat3m.dartagnan.task.Context;
 import com.dat3m.dartagnan.model.EventData;
-import com.dat3m.dartagnan.model.ExecutionModel;
 import com.dat3m.dartagnan.wmm.Constraint;
-import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.Wmm;
-import com.dat3m.dartagnan.wmm.axiom.Axiom;
-import com.dat3m.dartagnan.wmm.axiom.Emptiness;
+import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
+import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
 import com.dat3m.dartagnan.wmm.definition.*;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.sosy_lab.common.configuration.Configuration;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
-import org.sosy_lab.common.configuration.Option;
-import org.sosy_lab.common.configuration.Options;
 import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 import org.sosy_lab.java_smt.api.SolverContext;
 import org.sosy_lab.java_smt.api.SolverException;
 
-import java.text.DecimalFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.dat3m.dartagnan.configuration.OptionNames.*;
-import static com.dat3m.dartagnan.program.analysis.SyntacticContextAnalysis.*;
 import static com.dat3m.dartagnan.solver.caat.CAATSolver.Status.*;
 import static com.dat3m.dartagnan.task.verification.VerificationStatus.*;
 import static com.dat3m.dartagnan.utils.Utils.toTimeString;
-import static com.dat3m.dartagnan.wmm.RelationNameRepository.*;
+import static java.util.function.Predicate.not;
 
 /*
-    Refinement is a custom solving procedure that starts from a weak memory model (possibly the empty model)
-    and iteratively refines it to perform a verification task.
-    It can be understood as a lazy offline-SMT solver.
+    Axiom refinement is a custom solving procedure that starts with free memory model axioms and iteratively refines
+    their derivations from base relations to perform a verification task.
+    It can be understood as a hybrid eager-lazy offline-SMT solver.
     More concretely, it iteratively
-        - finds some assertion-violating execution w.r.t. some (very weak) baseline memory model
+        - finds some assertion-violating execution w.r.t. (possibly free) memory model axioms
         - checks the consistency of this execution using a custom theory solver (CAAT-Solver)
-        - refines the used memory model if the found execution was inconsistent, using the explanations
-          provided by the theory solver.
+        - refines the derivation of axioms from base relations if the found execution was inconsistent, using the
+          explanations provided by the theory solver.
  */
-@Options
-public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> implements Verifier {
+public class AxiomRefinementSolver extends RefinementSolver {
 
     private static final Logger logger = LoggerFactory.getLogger(AxiomRefinementSolver.class);
 
     // ================================================================================================================
-    // Configuration
-
-    @Option(name=COVERAGE,
-            description="Prints the coverage report (this option requires --method=lazy).",
-            secure=true,
-            toUppercase=true)
-    private boolean printCovReport = false;
-
-    // ================================================================================================================
     // Data classes
-
-    private enum SMTStatus {
-        SAT, UNSAT, UNKNOWN
-    }
 
     private record RefinementIteration(
             SMTStatus smtStatus,
@@ -96,8 +64,9 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
             CAATSolver.Status caatStatus,
             BooleanFormula refinementFormula,
             // The following are only for statistics keeping
-            WMMSolver.Statistics caatStats,
+            EazyWMMSolver.Statistics caatStats,
             DNF<CoreLiteral> inconsistencyReasons,
+            Conjunction<CoreImplication> inconsistencyImplications,
             List<Event> observedEvents
     ) {
         public boolean isInconclusive() { return smtStatus == SMTStatus.SAT && caatStatus == INCONSISTENT; }
@@ -138,31 +107,16 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
     }
 
     // ================================================================================================================
-    // Refinement solver
+    // Axiom refinement solver
 
     private EncodingContext context;
 
     private AxiomRefinementSolver(VerificationTask task) throws InvalidConfigurationException {
         super(task);
-        task.getConfig().inject(this);
     }
 
     public static AxiomRefinementSolver create(VerificationTask task) throws InvalidConfigurationException  {
         return new AxiomRefinementSolver(task);
-    }
-
-    protected Context preprocessAndAnalyze(Task task) throws InvalidConfigurationException {
-        final Configuration config = task.getConfig();
-
-        preprocessProgram(task, config);
-        preprocessMemoryModel(task);
-        instrumentPolaritySeparation(task.getMemoryModel());
-
-        final Context analysisContext = Context.create();
-        performStaticProgramAnalyses(task, analysisContext, config);
-        performStaticWmmAnalyses(task, analysisContext, config);
-        performIntervalAnalysis(task, analysisContext, config);
-        return analysisContext;
     }
 
     @Override
@@ -170,21 +124,36 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
         // ------------------------ Preprocessing / Analysis ------------------------
         final Context analysisContext = preprocessAndAnalyze(task);
 
+        //  ------- Generate refinement model -------
+        final Wmm memoryModel = task.getMemoryModel();
+        final Collection<Constraint> wmmConstraintsToEncode = new LinkedHashSet<>(generateCut(memoryModel));
+        // We want to encode all acyclicity axioms but without dependencies
+        final Collection<? extends Constraint> eazyConstraints = memoryModel.getAxioms().stream()
+                .filter(Acyclicity.class::isInstance)
+                .filter(not(wmmConstraintsToEncode::contains))
+                .map(a -> new Acyclicity(a.getRelation(), a.isNegated(), a.isFlagged()) {
+                    @Override
+                    public List<? extends Relation> getConstrainedRelations() {
+                        return Collections.emptyList();
+                    }
+                })
+                .toList();
+        wmmConstraintsToEncode.addAll(eazyConstraints);
+
         // ------------------------ Encoding ------------------------
         initSMTSolver(task.getConfig());
         final SolverContext ctx = this.solverContext;
         final ProverWithTracker prover = this.prover;
 
-        //  ------- Generate refinement model -------
-        context = EncodingContext.of(task, analysisContext, ctx.getFormulaManager(), generateCut(task.getMemoryModel()));
+        context = EncodingContext.of(task, analysisContext, ctx.getFormulaManager(), wmmConstraintsToEncode);
         final ProgramEncoder programEncoder = ProgramEncoder.withContext(context);
         final WmmEncoder baselineEncoder = WmmEncoder.withContext(context);
         final PropertyEncoder propertyEncoder = PropertyEncoder.withContext(context, baselineEncoder);
         final SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
 
         final BooleanFormulaManager bmgr = ctx.getFormulaManager().getBooleanFormulaManager();
-        final WMMSolver solver = WMMSolver.withContext(context);
-        final Refiner refiner = Refiner.newInstance();
+        final EazyWMMSolver solver = EazyWMMSolver.withContext(context, analysisContext.requires(RelationAnalysis.class), eazyConstraints);
+        final EazyRefiner refiner = EazyRefiner.newInstance();
         final Property.Type propertyType = Property.getCombinedType(task.getProperties(), task);
 
         logger.info("Starting encoding using {}", ctx.getVersion());
@@ -199,7 +168,7 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
         prover.addConstraint(programEncoder.encodeBounds());
 
         // ------------------------ Solving ------------------------
-        logger.info("Refinement procedure started.");
+        logger.info("Axiom refinement procedure started.");
 
         logger.info("Checking target property.");
         prover.push();
@@ -211,7 +180,7 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
 
         if (smtStatus == SMTStatus.UNKNOWN) {
             // Refinement got no result (should not be able to happen), so we cannot proceed further.
-            logger.warn("Refinement procedure was inconclusive. Trying to find reason of inconclusiveness.");
+            logger.warn("Axiom refinement procedure was inconclusive. Trying to find reason of inconclusiveness.");
             analyzeInconclusiveness(task, analysisContext, solver.getExecution());
             throw new RuntimeException("Terminated verification due to inconclusiveness (bug?).");
         }
@@ -269,9 +238,7 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
 
         logProverStatistics(logger, prover);
 
-        if (printCovReport) {
-            System.out.println(generateCoverageReport(combinedTrace.getObservedEvents(), task.getProgram(), analysisContext));
-        }
+        printCovReport(combinedTrace.getObservedEvents(), task.getProgram(), analysisContext);
 
         final IREvaluator model = smtStatus == SMTStatus.SAT ? context.newEvaluator(prover) : null;
         if (model != null) {
@@ -285,62 +252,11 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
         return new VerificationResult(this.task, res, model);
     }
 
-    private void validateModel(ExecutionModel model) {
-        // Check if there are accesses to uninitialized registers
-        for (ExecutionModel.UninitRegRead uninitRegRead : model.getUninitRegReads()) {
-            logger.warn("Encountered uninitialized register {} read by {}: {}.",
-                    uninitRegRead.register(), uninitRegRead.at().getGlobalId(), uninitRegRead.at());
-        }
-
-        // TODO: Check if there is OOB or any aliasing violation
-    }
-
-    private void analyzeInconclusiveness(Task task, Context analysisContext, ExecutionModel model) {
-        final AliasAnalysis alias = analysisContext.get(AliasAnalysis.class);
-        if (alias == null) {
-            return;
-        }
-        SyntacticContextAnalysis synContext = analysisContext.get(SyntacticContextAnalysis.class);
-        if (synContext == null) {
-            synContext = SyntacticContextAnalysis.newInstance(task.getProgram());
-        }
-
-        final Map<Object, Set<EventData>> addr2Events = new HashMap<>();
-        model.getAddressReadsMap().forEach((addr, reads) -> addr2Events.computeIfAbsent(addr, _ -> new HashSet<>()).addAll(reads));
-        model.getAddressWritesMap().forEach((addr, writes) -> addr2Events.computeIfAbsent(addr, _ -> new HashSet<>()).addAll(writes));
-
-        for (Set<EventData> sameLocEvents : addr2Events.values()) {
-            final List<EventData> events = sameLocEvents.stream().sorted().toList();
-
-            for (int i = 0; i < events.size() - 1; i++) {
-                for (int j = i + 1; j < events.size(); j++) {
-                    final MemoryCoreEvent e1 = (MemoryCoreEvent) events.get(i).getEvent();
-                    final MemoryCoreEvent e2 = (MemoryCoreEvent) events.get(j).getEvent();
-                    if (!alias.mayAlias(e1, e2)) {
-                        final StringBuilder builder = new StringBuilder();
-                        builder.append("Found unexpected aliasing between:\n");
-                        builder.append("\t")
-                                .append(synContext.getSourceLocationWithContext(e1, true))
-                                .append("\n")
-                                .append("AND\n")
-                                .append("\t")
-                                .append(synContext.getSourceLocationWithContext(e2, true))
-                                .append("\n");
-                        builder.append("Possible out-of-bounds access in source code or error in alias analysis.");
-
-                        logger.warn(builder.toString());
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
     // ================================================================================================================
-    // Refinement core algorithm
+    // Axiom refinement core algorithm
 
     // TODO: We could expose the following method(s) to allow for more general application of refinement.
-    private RefinementTrace runRefinement(ProverWithTracker prover, WMMSolver solver, Refiner refiner)
+    private RefinementTrace runRefinement(ProverWithTracker prover, EazyWMMSolver solver, EazyRefiner refiner)
             throws SolverException, InterruptedException {
 
         final List<RefinementIteration> trace = new ArrayList<>();
@@ -380,6 +296,11 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
                     for (Conjunction<CoreLiteral> cube : iteration.inconsistencyReasons.getCubes()) {
                         traceMessage.append(cube).append("\n");
                     }
+
+                    traceMessage.append("Found inconsistency implications:\n");
+                    for (CoreImplication implication : iteration.inconsistencyImplications.getLiterals()) {
+                        traceMessage.append(implication).append("\n");
+                    }
                     logger.trace(traceMessage.toString());
                 }
             }
@@ -394,24 +315,13 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
         }
         final RefinementIteration last = trace.getLast();
         final RefinementIteration prev = trace.get(trace.size() - 2);
-        return !last.inconsistencyReasons.equals(prev.inconsistencyReasons);
-    }
-
-    private static boolean isUnknownDefinitionForCAAT(Definition def) {
-        // TODO: We should probably automatically cut all "unknown relation",
-        //  i.e., use a white list of known relations instead of a black list of unknown one's.
-        return def instanceof AMOPairs || def instanceof SameInstruction || def instanceof Free // Basic
-                || def instanceof LinuxCriticalSections // LKMM
-                || def instanceof CASDependency // IMM
-                // GPUs
-                || def instanceof SameScope || def instanceof SyncWith
-                || def instanceof SyncFence || def instanceof SyncBar || def instanceof SameVirtualLocation;
+        return !(last.inconsistencyReasons.equals(prev.inconsistencyReasons) && last.inconsistencyImplications.equals(prev.inconsistencyImplications));
     }
 
     // ================================================================================================================
     // Special memory model processing
 
-    private RefinementIteration doRefinementIteration(ProverWithTracker prover, WMMSolver solver, Refiner refiner)
+    private RefinementIteration doRefinementIteration(ProverWithTracker prover, EazyWMMSolver solver, EazyRefiner refiner)
             throws SolverException, InterruptedException {
 
         long nativeTime;
@@ -419,8 +329,9 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
         long refineTime = 0;
         CAATSolver.Status caatStatus = INCONCLUSIVE;
         BooleanFormula refinementFormula = null;
-        WMMSolver.Statistics caatStats = null;
+        EazyWMMSolver.Statistics caatStats = null;
         DNF<CoreLiteral> inconsistencyReasons = null;
+        Conjunction<CoreImplication> inconsistencyImplications = null;
         List<Event> observedEvents = null;
 
         // ------------ Native SMT solving ------------
@@ -431,7 +342,7 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
         if (smtStatus == SMTStatus.SAT) {
             // ------------ CAAT solving ------------
             lastTime = System.currentTimeMillis();
-            final WMMSolver.Result solverResult;
+            final EazyWMMSolver.Result solverResult;
             try (IREvaluator model = context.newEvaluator(prover)) {
                 solverResult = solver.check(model);
             } catch (SolverException e) {
@@ -446,8 +357,9 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
             if (caatStatus == INCONSISTENT) {
                 // ------------ Refining ------------
                 inconsistencyReasons = solverResult.getCoreReasons();
+                inconsistencyImplications = solverResult.getCoreImplications();
                 lastTime = System.currentTimeMillis();
-                refinementFormula = refiner.refine(inconsistencyReasons, context);
+                refinementFormula = refiner.refine(inconsistencyReasons, inconsistencyImplications, context);
                 prover.writeComment("Refinement encoding");
                 prover.addConstraint(refinementFormula);
                 refineTime = (System.currentTimeMillis() - lastTime);
@@ -456,203 +368,15 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
 
         return new RefinementIteration(
                 smtStatus, nativeTime, caatTime, refineTime, caatStatus,
-                refinementFormula, caatStats, inconsistencyReasons, observedEvents
+                refinementFormula, caatStats, inconsistencyReasons, inconsistencyImplications, observedEvents
         );
-    }
-
-    private static Set<Constraint> generateCut(Wmm model) {
-        // We cut (i) negated axioms, (ii) negated relations (if derived),
-        // and (iii) some special relations because they are derived from internal relations (like data/addr/ctrl)
-        // or because we have no dedicated implementation for them in CAAT (like Linux' rscs).
-        // We also cut annotated constraints.
-        final Set<Constraint> constraintsToCut = new LinkedHashSet<>();
-        for (Constraint c : model.getConstraints()) {
-            // Cut annotated constraints
-            if (c.hasMetadata(Wmm.CutAnnotation.class) ||
-                    c instanceof Definition def && def.getDefinedRelation().hasMetadata(Wmm.CutAnnotation.class)) {
-                constraintsToCut.add(c);
-                continue;
-            }
-
-            switch (c) {
-                case Axiom ax when ax.isNegated() ->
-                    // (i) Negated axioms
-                        constraintsToCut.add(ax);
-                case Difference diff -> {
-                    // (ii) Negated relations (if derived)
-                    final Relation sub = diff.getSubtrahend();
-                    final Definition subDef = sub.getDefinition();
-                    if (!sub.getDependencies().isEmpty()) {
-                        constraintsToCut.add(subDef);
-                    }
-                }
-                case Definition def when def.getDefinedRelation().hasName() -> {
-                    // (iii) Special relations
-                    final String name = def.getDefinedRelation().getName().get();
-                    if (name.equals(DATA) || name.equals(CTRL) || name.equals(ADDR) || isUnknownDefinitionForCAAT(def)) {
-                        constraintsToCut.add(c);
-                    }
-                }
-                default -> { }
-            }
-        }
-        return constraintsToCut;
-    }
-
-
-    /*
-        The constraints/relations of the Wmm can be categorised into positive and negative,
-        depending on whether the number of negations applied to the constraint/relation is even (=positive)
-        or odd (=negative).
-        Negations come from negated axioms (~empty(r)), RHS of differences (c = a \ b), or
-        complementation (Y = ~X). Complementation is just a difference: ~X = _ \ X, so there is no special
-        treatment required.
-        A relation can be both negative and positive if it is used multiple times,
-        once with odd negations and once with even negations.
-        It can also be neither, if the relation is dead (i.e., irrelevant for all axioms).
-     */
-    private record PolaritySeparator(Set<Constraint> positives, Set<Constraint> negatives) { }
-
-    private PolaritySeparator computePolaritySeparator(Wmm wmm) {
-        final Set<Constraint> positives = new LinkedHashSet<>();
-        final Set<Constraint> negatives = new LinkedHashSet<>();
-        final Constraint.Visitor<Void> collector = new Constraint.Visitor<>() {
-            private boolean polarity = true;
-
-            @Override
-            public Void visitAxiom(Axiom axiom) {
-                polarity = !axiom.isNegated();
-                process(axiom);
-                return axiom.getRelation().getDefinition().accept(this);
-            }
-
-            @Override
-            public Void visitDefinition(Definition def) {
-                if (process(def)) {
-                    def.getConstrainedRelations().subList(1, def.getConstrainedRelations().size())
-                            .forEach(r -> r.getDefinition().accept(this));
-                }
-                return null;
-            }
-
-            @Override
-            public Void visitDifference(Difference def) {
-                if (process(def)) {
-                    def.getMinuend().getDefinition().accept(this);
-                    polarity = !polarity;
-                    def.getSubtrahend().getDefinition().accept(this);
-                    polarity = !polarity;
-                }
-                return null;
-            }
-
-            private boolean process(Constraint c) {
-                return (polarity ? positives : negatives).add(c);
-            }
-        };
-
-        wmm.getAxioms().forEach(ax -> ax.accept(collector));
-        return new PolaritySeparator(positives, negatives);
-    }
-
-    /*
-        This pass rewrites the memory model so that no non-negative constraints appear on the RHS of a difference.
-        Consider "r = a \ b" where b is non-negative (note that r and a must be non-positive then).
-        For example, this is the case if there is a constraint "~empty(r)"
-        We rewrite the model to
-
-            let b'= free()
-            let r = a \ b' // b' gets cut, but it is effectively a base relation so this causes no large encoding.
-            empty (r & b) // b is now in a positive position and thus not need to get cut.
-
-        We claim that this model is equisatisfiable to the original memory model.
-        To understand this intuitively, it is helpful so think of the fresh b' as the original b but with "some slack".
-        We will argue that the best choice for b' is precisely b.
-        Any larger choice for b' will make r smaller, but since r is non-positive this reduces the chances
-        of satisfying negated axioms (e.g., if "~empty(r)" is true for some small r, then it is also true for all larger r).
-        On the other hand, if b' is chosen too small, then r gets so large that it violates "empty(r & b)".
-
-        We prove this formally. Towards this, we reason about executions M which are to be understood
-        as an interpretation of the relations of the memory model.
-        So, e.g., M(rf) is the value of rf (=the concrete binary relation) in the execution M.
-
-        "NEW => ORIGINAL":
-        Suppose M' is a consistent execution under the new memory model.
-        Then from "let r = a \ b'" it follows that
-            M'(r) \subseteq M'(a).
-        Furthermore, from "empty (r & b)" it follows that
-            M'(r) \subseteq ~M'(b).
-        Combining both, we get
-            M'(r) \subseteq (M'(a) & ~M'(b)) = (M'(a) \ M'(b)).
-        Now consider an execution M under the original memory model that matches with M' on the base relations
-        (modulo b' which does not exist in the original model).
-        Since both models agree on all base relations except b', they also agree on all derived relations
-        that are independent of b'.
-        In particular, since a and b are independent of b', we have M(a) = M'(a) and M(b) = M'(b), so that
-            M'(r) \subseteq (M'(a) \ M'(b)) = (M(a) \ M(b)) = M(r).
-        So the original memory model has a potentially larger interpretation for r (M'(r) \subseteq M(r)).
-        Since r is non-positive, we know that a larger relation satisfies more axioms (e.g.,
-        if r' is non-empty/non-acyclic/non-irreflexive, then the larger r will also satisfy these).
-        So M is a consistent execution under the original memory model.
-
-        "NEW <= ORIGINAL":
-        Suppose M is a consistent execution under the original model.
-        Then we can construct M' that matches with M on all common base relations but also sets M'(b') := M(b).
-        It is clear that M' now matches on all derived relations with M and so it satisfies the same axioms
-        and thus is also consistent.
-
-        NOTE: We argued about consistency only, but the same reasoning also applies to violation of flagged axioms,
-        i.e., the difference between "~empty(r)" and "flag ~empty(r)" is irrelevant for the argumentation.
-
-        NOTE 2: This rewriting is always possible.
-
-        NOTE 3: There is a minor caveat in the new memory model.
-        If an execution under the original memory model violates, e.g., "flag ~empty(r)" with multiple edges {e1, ..., ek},
-        then for the same execution the new memory model could report only a subset of those violations.
-        The reason is that the SMT solver has some slack in the choice of b':
-        it will choose b' such "flag ~empty(r)" holds (i.e., we have a violation), but it will not guarantee to
-        make the choice in such a way that it maximizes the number of violations.
-        If we want to get all violations of an execution, we could take the found execution (under the new memory model)
-        and simply recompute it under the original memory model, giving us the precise violations.
-     */
-    private void instrumentPolaritySeparation(Wmm wmm) {
-        final PolaritySeparator separator = computePolaritySeparator(wmm);
-        final List<Difference> negDiff = separator.negatives().stream()
-                .filter(Difference.class::isInstance).map(Difference.class::cast)
-                .filter(diff -> !separator.negatives().contains(diff.getSubtrahend().getDefinition()))
-                .distinct().toList();
-
-        final Map<Relation, Relation> replacements = new HashMap<>();
-        int counter = 0;
-        for (Difference diff : negDiff) {
-            // r = a \ b where r and a are non-positive and b is non-negative.
-            final Relation r = diff.getDefinedRelation();
-            final Relation a = diff.getMinuend();
-            final Relation b = diff.getSubtrahend();
-
-            // (1) Create b' (if not already existing)
-            final Relation bPrime;
-            if (replacements.containsKey(b)) {
-                bPrime = replacements.get(b);
-            } else {
-                final String bPrimeName = b.getName().map(n -> n + "__POS").orElse("__POS" + counter++);
-                bPrime = wmm.addDefinition(new Free(wmm.newRelation(bPrimeName, b.getArity())));
-                replacements.put(b, bPrime);
-            }
-            // (2) Rewrite  r = a \ b  to  r = a \ b'
-            wmm.removeDefinition(r);
-            wmm.addDefinition(new Difference(r, a, bPrime));
-            // (3) Add empty (r & b)
-            final Relation intersection = wmm.addDefinition(new Intersection(wmm.newRelation(b.getArity()), r, b));
-            wmm.addConstraint(new Emptiness(intersection));
-        }
     }
 
     // ================================================================================================================
     // Statistics & Debugging
 
     private static String generateSummary(RefinementTrace trace, long boundCheckTime) {
-        final List<WMMSolver.Statistics> statList = trace.iterations.stream()
+        final List<EazyWMMSolver.Statistics> statList = trace.iterations.stream()
                 .filter(iter -> iter.caatStats != null).map(RefinementIteration::caatStats).toList();
         final long totalNativeSolvingTime = trace.getNativeSmtTime();
         final long totalCaatTime = trace.getCaatTime();
@@ -662,19 +386,24 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
         long totalPopulationTime = 0;
         long totalConsistencyCheckTime = 0;
         long totalReasonComputationTime = 0;
+        long totalImplicationComputationTime = 0;
         long totalNumReasons = 0;
         long totalNumReducedReasons = 0;
+        long totalNumImplications = 0;
         long totalModelSize = 0;
         long minModelSize = Long.MAX_VALUE;
         long maxModelSize = Long.MIN_VALUE;
 
-        for (WMMSolver.Statistics stats : statList) {
+        for (EazyWMMSolver.Statistics stats : statList) {
             totalModelExtractTime += stats.getModelExtractionTime();
             totalPopulationTime += stats.getPopulationTime();
             totalConsistencyCheckTime += stats.getConsistencyCheckTime();
             totalReasonComputationTime += stats.getBaseReasonComputationTime() + stats.getCoreReasonComputationTime();
+            totalImplicationComputationTime +=
+                    stats.getBaseImplicationComputationTime() + stats.getCoreImplicationComputationTime();
             totalNumReasons += stats.getNumComputedCoreReasons();
             totalNumReducedReasons += stats.getNumComputedReducedCoreReasons();
+            totalNumImplications += stats.getNumComputedCoreImplications();
 
             totalModelSize += stats.getModelSize();
             minModelSize = Math.min(stats.getModelSize(), minModelSize);
@@ -691,9 +420,12 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
                 .append("   -- Population time: ").append(toTimeString(totalPopulationTime)).append("\n")
                 .append("   -- Consistency check time: ").append(toTimeString(totalConsistencyCheckTime)).append("\n")
                 .append("   -- Reason computation time: ").append(toTimeString(totalReasonComputationTime)).append("\n")
+                .append("   -- Implication computation time: ")
+                .append(toTimeString(totalImplicationComputationTime)).append("\n")
                 .append("   -- Refining time: ").append(toTimeString(totalRefiningTime)).append("\n")
                 .append("   -- #Computed core reasons: ").append(totalNumReasons).append("\n")
-                .append("   -- #Computed core reduced reasons: ").append(totalNumReducedReasons).append("\n");
+                .append("   -- #Computed core reduced reasons: ").append(totalNumReducedReasons).append("\n")
+                .append("   -- #Computed core implications: ").append(totalNumImplications).append("\n");
         if (!statList.isEmpty()) {
             message.append("   -- Min model size (#events): ").append(minModelSize).append("\n")
                     .append("   -- Average model size (#events): ").append(totalModelSize / statList.size())
@@ -703,69 +435,4 @@ public class AxiomRefinementSolver extends SMTModelChecker<VerificationTask> imp
 
         return message.toString();
     }
-
-    private static CharSequence generateCoverageReport(Set<Event> coveredEvents, Program program,
-                                                       Context analysisContext) {
-        // We track symmetric events
-        final ThreadSymmetry symm = analysisContext.requires(ThreadSymmetry.class);
-        final BranchEquivalence cf = analysisContext.requires(BranchEquivalence.class);
-
-        final Set<Event> programEvents = program.getThreadEvents(MemoryEvent.class).stream()
-                // TODO: Can we have events with source information but without oid?
-                .filter(e -> e.hasMetadata(SourceLocation.class) && e.hasMetadata(Event.OriginalId.class))
-                .collect(Collectors.toSet());
-
-        // Track (covered) events and branches via oId
-        final Set<Event.OriginalId> branches = new HashSet<>();
-        final Set<Event.OriginalId> coveredBranches = new HashSet<>();
-
-        // Events not executed in any violating execution
-        final Set<String> messageSet = new TreeSet<>(); // TreeSet to keep strings in order
-
-        final SyntacticContextAnalysis synContext = SyntacticContextAnalysis.newInstance(program);
-
-        for (Event e : programEvents) {
-            EquivalenceClass<Thread> clazz = symm.getEquivalenceClass(e.getThread());
-            Event symmRep = symm.map(e, clazz.getRepresentative());
-            Event.OriginalId branchRepId = cf.getRepresentative(symmRep).getMetadata(Event.OriginalId.class);
-            assert branchRepId != null;
-
-            if(coveredEvents.contains(e)) {
-                coveredBranches.add(branchRepId);
-            } else {
-                final String threads = clazz.stream().map(t -> "T" + t.getId())
-                        .collect(Collectors.joining(" / "));
-                final String callStack = makeContextString(
-                        synContext.getContextInfo(e).getContextOfType(CallContext.class), " -> ");
-                messageSet.add(String.format("%s: %s%s", threads,
-                        callStack.isEmpty() ? callStack : callStack + " -> ",
-                        getSourceLocationString(symmRep)));
-            }
-            branches.add(branchRepId);
-        }
-
-        // When using the % symbol, the value multiplied by 100 before applying the format string.
-        DecimalFormat df = new DecimalFormat("#.##%");
-        // messageSet contains the missing ones, thus the 100 - X ...
-        final double eventCoveragePercentage = 1d - (messageSet.size() * 1d / programEvents.size());
-        final double branchCoveragePercentage = coveredBranches.size() * 1d / branches.size();
-
-        final StringBuilder report = new StringBuilder()
-                .append("Events executed by at least one property-violating behavior, including inconsistent executions: \n")
-                .append("\t-- Events: ")
-                .append(String.format("%s (%s / %s)", df.format(eventCoveragePercentage),
-                        programEvents.size() - messageSet.size(), programEvents.size()))
-                .append("\n")
-                .append("\t-- Branches: ")
-                .append(String.format("%s (%s / %s)", df.format(branchCoveragePercentage), coveredBranches.size(),
-                        branches.size()))
-                .append("\n");
-        if (eventCoveragePercentage < 1d) {
-            report.append("\t-- Missing events: \n");
-            messageSet.forEach(s -> report.append("\t\t").append(s).append("\n"));
-        }
-
-        return report;
-    }
-
 }
