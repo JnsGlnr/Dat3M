@@ -8,6 +8,7 @@ import com.dat3m.dartagnan.solver.caat.constraints.AcyclicityConstraint;
 import com.dat3m.dartagnan.solver.caat.constraints.Constraint;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreImplication;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreLiteral;
+import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.TrivialImplications;
 import com.dat3m.dartagnan.utils.logic.Conjunction;
 import com.dat3m.dartagnan.utils.logic.DNF;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
@@ -19,14 +20,17 @@ import java.util.*;
 */
 public class EazyWMMSolver extends WMMSolver {
 
-    private EazyWMMSolver(EncodingContext c, Collection<? extends com.dat3m.dartagnan.wmm.Constraint> eazyConstraints)
+    private final TrivialImplications trivialImplications;
+
+    private EazyWMMSolver(EncodingContext c, TrivialImplications trivialImplications)
             throws InvalidConfigurationException {
-        super(c, new ExecutionGraph(c.getTask().getMemoryModel(), constraint -> c.isEncoded(constraint) && !eazyConstraints.contains(constraint)));
+        super(c, new ExecutionGraph(c.getTask().getMemoryModel(), constraint -> c.isEncoded(constraint) && !trivialImplications.isEazy(constraint)));
+        this.trivialImplications = trivialImplications;
     }
 
-    public static EazyWMMSolver withContext(EncodingContext context, Collection<? extends com.dat3m.dartagnan.wmm.Constraint> eazyConstraints)
+    public static EazyWMMSolver withContext(EncodingContext context, TrivialImplications trivialImplications)
             throws InvalidConfigurationException {
-        return new EazyWMMSolver(context, eazyConstraints);
+        return new EazyWMMSolver(context, trivialImplications);
     }
 
     public Result check(IREvaluator model) {
@@ -56,7 +60,7 @@ public class EazyWMMSolver extends WMMSolver {
 
             // ============== Compute Core implications ==============
             curTime = System.currentTimeMillis();
-            result.coreImplications = reasoner.toCoreImplications(solver.computeInconsistencyImplications(eazyConstraints));
+            result.coreImplications = reasoner.toCoreImplications(solver.computeInconsistencyImplications(eazyConstraints), trivialImplications);
             stats.numComputedCoreImplications = result.coreImplications.getSize();
             stats.coreImplicationComputationTime = System.currentTimeMillis() - curTime;
 
