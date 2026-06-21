@@ -7,6 +7,7 @@ import com.dat3m.dartagnan.utils.Utils;
 import com.dat3m.dartagnan.verification.model.ExecutionModelManager;
 import com.dat3m.dartagnan.verification.model.ExecutionModelNext;
 import com.dat3m.dartagnan.verification.solving.AssumeSolver;
+import com.dat3m.dartagnan.verification.solving.AxiomRefinementSolver;
 import com.dat3m.dartagnan.verification.solving.ModelChecker;
 import com.dat3m.dartagnan.verification.solving.RefinementSolver;
 import com.google.common.base.Preconditions;
@@ -97,6 +98,7 @@ public class TaskSolver implements AutoCloseable {
 
         modelChecker = switch (method) {
             case EAGER -> AssumeSolver.create(task);
+            case EAZY -> AxiomRefinementSolver.create(task);
             case LAZY -> RefinementSolver.create(task);
         };
         if (shutdownManager != null) {
