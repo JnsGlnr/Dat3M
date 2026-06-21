@@ -49,6 +49,7 @@ public final class VerificationTaskSolver extends TaskSolverBase<VerificationTas
         Preconditions.checkState(verifier == null, "Verifier already initialized");
         verifier = switch (method) {
             case EAGER -> AssumeSolver.create(task);
+            case EAZY -> AxiomRefinementSolver.create(task);
             case LAZY -> RefinementSolver.create(task);
         };
         verifier.setShutdownManager(shutdownManager);
