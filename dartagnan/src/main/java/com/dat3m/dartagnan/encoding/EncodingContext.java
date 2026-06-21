@@ -94,6 +94,8 @@ public final class EncodingContext {
         // NOTE: This guarantees a deterministic ordering of the constraints to be encoded
         constraintsToEncode = t.getMemoryModel().getConstraints().stream()
                 .filter(depGraph::contains)
+                .map(depGraph::get)
+                .map(DependencyGraph.Node::getContent)
                 .toList();
     }
 

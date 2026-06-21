@@ -94,7 +94,7 @@ public class RefinementSolver extends ModelChecker {
     // ================================================================================================================
     // Data classes
 
-    private enum SMTStatus {
+    protected enum SMTStatus {
         SAT, UNSAT, UNKNOWN
     }
 
@@ -151,9 +151,9 @@ public class RefinementSolver extends ModelChecker {
     // ================================================================================================================
     // Refinement solver
 
-    private RefinementSolver(VerificationTask task) throws InvalidConfigurationException {
+    RefinementSolver(VerificationTask task) throws InvalidConfigurationException {
         super(task);
-        task.getConfig().inject(this);
+        task.getConfig().inject(this, RefinementSolver.class);
     }
 
     public static RefinementSolver create(VerificationTask task) throws InvalidConfigurationException  {
@@ -180,7 +180,7 @@ public class RefinementSolver extends ModelChecker {
         final Configuration config = task.getConfig();
 
         // ------------------------ Preprocessing / Analysis ------------------------
-        final Collection<Constraint> biases = addBiases(memoryModel, baselines);
+        final Collection<Constraint> biases = addBiases(memoryModel);
         preprocess(task);
 
         final Context analysisContext = Context.create();
@@ -292,9 +292,7 @@ public class RefinementSolver extends ModelChecker {
             logProverStatistics(logger, prover);
         }
 
-        if (printCovReport) {
-            System.out.println(generateCoverageReport(combinedTrace.getObservedEvents(), program, analysisContext));
-        }
+        printCovReport(combinedTrace.getObservedEvents(), program, analysisContext);
 
         // For Safety specs, we have SAT=FAIL, but for reachability specs, we have
         // SAT=PASS
@@ -306,7 +304,7 @@ public class RefinementSolver extends ModelChecker {
         logger.info("Verification finished with result {}", res);
     }
 
-    private void validateModel(ExecutionModel model) {
+    protected void validateModel(ExecutionModel model) {
         // Check if there are accesses to uninitialized registers
         for (ExecutionModel.UninitRegRead uninitRegRead : model.getUninitRegReads()) {
             logger.warn("Encountered uninitialized register {} read by {}: {}.",
@@ -316,7 +314,7 @@ public class RefinementSolver extends ModelChecker {
         // TODO: Check if there is OOB or any aliasing violation
     }
 
-    private void analyzeInconclusiveness(Task task, Context analysisContext, ExecutionModel model) {
+    protected void analyzeInconclusiveness(Task task, Context analysisContext, ExecutionModel model) {
         final AliasAnalysis alias = analysisContext.get(AliasAnalysis.class);
         if (alias == null) {
             return;
@@ -418,7 +416,7 @@ public class RefinementSolver extends ModelChecker {
         return !last.inconsistencyReasons.equals(prev.inconsistencyReasons);
     }
 
-    private static boolean isUnknownDefinitionForCAAT(Definition def) {
+    protected static boolean isUnknownDefinitionForCAAT(Definition def) {
         // TODO: We should probably automatically cut all "unknown relation",
         //  i.e., use a white list of known relations instead of a black list of unknown one's.
         return def instanceof AMOPairs || def instanceof SameInstruction || def instanceof Free // Basic
@@ -481,7 +479,7 @@ public class RefinementSolver extends ModelChecker {
         );
     }
 
-    private static Set<Constraint> generateCut(Wmm model) {
+    protected static Set<Constraint> generateCut(Wmm model) {
         // We cut (i) negated axioms, (ii) negated relations (if derived),
         // and (iii) some special relations because they are derived from internal relations (like data/addr/ctrl)
         // or because we have no dedicated implementation for them in CAAT (like Linux' rscs).
@@ -499,7 +497,7 @@ public class RefinementSolver extends ModelChecker {
                 }
             } else if (c instanceof Definition def && def.getDefinedRelation().hasName()) {
                 // (iii) Special relations
-                final String name = def.getDefinedRelation().getName().get();
+                final String name = def.getDefinedRelation().getName().orElseThrow();
                 if (name.equals(DATA) || name.equals(CTRL) || name.equals(ADDR) || isUnknownDefinitionForCAAT(def)) {
                     constraintsToCut.add(c);
                 }
@@ -508,8 +506,8 @@ public class RefinementSolver extends ModelChecker {
         return constraintsToCut;
     }
 
-    private static Collection<Constraint> addBiases(Wmm wmm, EnumSet<Baseline> biases) {
-        if (biases.isEmpty()) {
+    protected Collection<Constraint> addBiases(Wmm wmm) {
+        if (baselines.isEmpty()) {
             return Collections.emptyList();
         }
 
@@ -538,7 +536,7 @@ public class RefinementSolver extends ModelChecker {
         final Relation fr = wmm.addDefinition(new Union(wmm.newRelation(), frStandard, urlocwrites));
 
         final List<Constraint> constraints = new ArrayList<>();
-        if (biases.contains(Baseline.UNIPROC)) {
+        if (baselines.contains(Baseline.UNIPROC)) {
             // ---- acyclic(po-loc | com) ----
             constraints.add(new Acyclicity(wmm.addDefinition(new Union(wmm.newRelation(),
                 wmm.addDefinition(new Intersection(wmm.newRelation(), po, loc)),
@@ -547,7 +545,7 @@ public class RefinementSolver extends ModelChecker {
                 fr
             ))));
         }
-        if (biases.contains(Baseline.NO_OOTA)) {
+        if (baselines.contains(Baseline.NO_OOTA)) {
             // ---- acyclic (dep | rf) ----
             constraints.add(new Acyclicity(wmm.addDefinition(new Union(wmm.newRelation(),
                 wmm.getOrCreatePredefinedRelation(CTRL),
@@ -556,7 +554,7 @@ public class RefinementSolver extends ModelChecker {
                 rf)
             )));
         }
-        if (biases.contains(Baseline.ATOMIC_RMW)) {
+        if (baselines.contains(Baseline.ATOMIC_RMW)) {
             // ---- empty (rmw & fre;coe) ----
             final Relation amo = wmm.getOrCreatePredefinedRelation(AMO);
             final Relation lxsx = wmm.getOrCreatePredefinedRelation(LXSX);
@@ -572,7 +570,7 @@ public class RefinementSolver extends ModelChecker {
     }
 
     /*
-        The constraints/relations of the Wmm can be categorised into positive and negative,
+        The constraints/relations of the Wmm can be categorized into positive and negative,
         depending on whether the number of negations applied to the constraint/relation is even (=positive)
         or odd (=negative).
         Negations come from negated axioms (~empty(r)), RHS of differences (c = a \ b), or
@@ -773,6 +771,12 @@ public class RefinementSolver extends ModelChecker {
         }
 
         return message.toString();
+    }
+
+    protected void printCovReport(Set<Event> coveredEvents, Program program, Context analysisContext) {
+        if (printCovReport) {
+            System.out.println(generateCoverageReport(coveredEvents, program, analysisContext));
+        }
     }
 
     private static CharSequence generateCoverageReport(Set<Event> coveredEvents, Program program,
