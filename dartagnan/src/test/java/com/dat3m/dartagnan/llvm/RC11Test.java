@@ -67,4 +67,9 @@ public class RC11Test extends AbstractCTest {
     public void testRefinement() throws Exception {
         testSolver(Method.LAZY);
     }
+
+    @Test
+    public void testAxiomRefinement() throws Exception {
+        testSolver(Method.EAZY);
+    }
 }

@@ -46,7 +46,7 @@ public class Refiner {
         return bmgr.and(refinement);
     }
 
-    private BooleanFormula encode(CoreLiteral literal, EncodingContext encoder) {
+    BooleanFormula encode(CoreLiteral literal, EncodingContext encoder) {
         final BooleanFormulaManager bmgr = encoder.getBooleanFormulaManager();
         final BooleanFormula enc;
         if (literal instanceof ExecLiteral lit) {
