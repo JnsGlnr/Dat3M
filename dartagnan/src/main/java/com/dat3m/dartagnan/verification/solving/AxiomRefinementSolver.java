@@ -391,6 +391,9 @@ public class AxiomRefinementSolver extends RefinementSolver {
         );
     }
 
+    private record ConstraintWithConditions(Constraint constraint, List<EventGraph> sideConditions) {
+    }
+
     private TrivialImplications getTrivialImplications(Collection<? extends Constraint> eazyConstraints) {
         final RelationAnalysis ra = context.getAnalysisContext().requires(RelationAnalysis.class);
         final Map<Relation, Map<Relation, Map<Event, List<Event>>>> result = new HashMap<>();
@@ -404,10 +407,11 @@ public class AxiomRefinementSolver extends RefinementSolver {
             final EventGraph must = ra.getKnowledge(eazyRel).getMustSet();
 
             final List<Constraint> foundConstraints = new ArrayList<>();
-            final Deque<Constraint> visited = new ArrayDeque<>();
-            visited.add(eazyConstraint);
+            final Deque<ConstraintWithConditions> visited = new ArrayDeque<>();
+            visited.add(new ConstraintWithConditions(eazyConstraint, new ArrayList<>()));
             while (!visited.isEmpty()) {
-                final Constraint constraint = visited.pop();
+                final ConstraintWithConditions constraintWithConditions = visited.pop();
+                final Constraint constraint = constraintWithConditions.constraint;
                 if (context.isEncoded(constraint)) {
                     if (!foundConstraints.contains(constraint)) {
                         final Definition def = (Definition) constraint;
@@ -415,6 +419,11 @@ public class AxiomRefinementSolver extends RefinementSolver {
                         final Map<Event, List<Event>> events = new HashMap<>();
                         ra.getKnowledge(rel).getMaySet().apply((e1, e2) -> {
                             if (!must.contains(e1, e2)) {
+                                for (EventGraph sideCondition : constraintWithConditions.sideConditions) {
+                                    if (!sideCondition.contains(e1, e2)) {
+                                        return;
+                                    }
+                                }
                                 events.computeIfAbsent(e1, k -> new ArrayList<>()).add(e2);
                             }
                         });
@@ -424,7 +433,34 @@ public class AxiomRefinementSolver extends RefinementSolver {
                 } else if (constraint instanceof Union || constraint instanceof SetIdentity
                         || constraint instanceof TransitiveClosure) {
                     for (Constraint dep : Wmm.computeConstraintDependencies(constraint)) {
-                        visited.push(dep);
+                        visited.push(new ConstraintWithConditions(dep, constraintWithConditions.sideConditions));
+                    }
+                } else if (constraint instanceof Intersection intersection) {
+                    final List<Relation> operands = intersection.getOperands();
+                    final List<EventGraph> localSideConditions = new ArrayList<>(operands.size() - 1);
+                    Relation mostUnknownRelation = null;
+                    EventGraph mostUnknownKnownElements = null;
+                    int mostUnknownSize = 0;
+                    for (Relation operand : operands) {
+                        final RelationAnalysis.Knowledge k = ra.getKnowledge(operand);
+                        final EventGraph mayOperands = k.getMaySet();
+                        final EventGraph mustOperands = k.getMustSet();
+                        final int unknownSize = mayOperands.size() - mustOperands.size();
+                        if (unknownSize > mostUnknownSize) {
+                            if (mostUnknownRelation != null) {
+                                localSideConditions.add(mostUnknownKnownElements);
+                            }
+                            mostUnknownRelation = operand;
+                            mostUnknownKnownElements = mustOperands;
+                            mostUnknownSize = unknownSize;
+                        } else {
+                            localSideConditions.add(mustOperands);
+                        }
+                    }
+                    if (mostUnknownRelation != null) {
+                        final List<EventGraph> sideConditions = new ArrayList<>(constraintWithConditions.sideConditions);
+                        sideConditions.addAll(localSideConditions);
+                        visited.push(new ConstraintWithConditions(mostUnknownRelation.getDefinition(), sideConditions));
                     }
                 }
             }
