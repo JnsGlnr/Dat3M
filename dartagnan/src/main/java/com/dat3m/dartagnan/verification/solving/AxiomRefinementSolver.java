@@ -43,6 +43,8 @@ import static com.dat3m.dartagnan.solver.caat.CAATSolver.Status.*;
 import static com.dat3m.dartagnan.utils.Result.*;
 import static com.dat3m.dartagnan.utils.Utils.toTimeString;
 import static java.util.function.Predicate.not;
+import static java.util.function.UnaryOperator.identity;
+import static java.util.stream.Collectors.toMap;
 
 /*
     Axiom refinement is a custom solving procedure that starts with free memory model axioms and iteratively refines
@@ -146,17 +148,18 @@ public class AxiomRefinementSolver extends RefinementSolver {
         // The cut has to be encoded.
         wmmConstraintsToEncode.addAll(generateCut(memoryModel));
         // We want to encode all acyclicity axioms but without dependencies
-        final Collection<? extends Constraint> eazyConstraints = memoryModel.getAxioms().stream()
+        final Map<Constraint, Constraint> constraintsToEazyConstraints = memoryModel.getAxioms().stream()
                 .filter(Acyclicity.class::isInstance)
                 .filter(not(wmmConstraintsToEncode::contains))
-                .map(a -> new Acyclicity(a.getRelation(), a.isNegated(), a.isFlagged()) {
+                .collect(toMap(identity(), a -> new Acyclicity(a.getRelation(), a.isNegated(), a.isFlagged()) {
                     @Override
                     public List<? extends Relation> getConstrainedRelations() {
                         return Collections.emptyList();
                     }
-                })
-                .toList();
+                }));
+        final Collection<Constraint> eazyConstraints = constraintsToEazyConstraints.values();
         wmmConstraintsToEncode.addAll(eazyConstraints);
+        wmmConstraintsToEncode.addAll(getNonStaticBaseConstraints(constraintsToEazyConstraints.keySet(), analysisContext));
 
         // ------------------------ Encoding ------------------------
         initSMTSolver(config);
@@ -389,6 +392,33 @@ public class AxiomRefinementSolver extends RefinementSolver {
                 smtStatus, nativeTime, caatTime, refineTime, caatStatus,
                 refinementFormula, caatStats, inconsistencyReasons, inconsistencyImplications, observedEvents
         );
+    }
+
+    private Collection<Constraint> getNonStaticBaseConstraints(Collection<Constraint> origEazyConstraints, Context analysisContext) {
+        final RelationAnalysis ra = analysisContext.requires(RelationAnalysis.class);
+        final Collection<Constraint> nonStaticBaseConstraints = new ArrayList<>();
+        for (Constraint eazyConstraint : origEazyConstraints) {
+            final Deque<Constraint> visited = new ArrayDeque<>();
+            visited.push(eazyConstraint);
+            while (!visited.isEmpty()) {
+                final Constraint constraint = visited.pop();
+                final Collection<? extends Constraint> deps = Wmm.computeConstraintDependencies(constraint);
+                if (deps.isEmpty()) {
+                    if (!nonStaticBaseConstraints.contains(constraint)) {
+                        final Relation baseRel = constraint.getConstrainedRelations().get(0);
+                        final RelationAnalysis.Knowledge k = ra.getKnowledge(baseRel);
+                        if (k.getMaySet().size() != k.getMustSet().size()) {
+                            nonStaticBaseConstraints.add(constraint);
+                        }
+                    }
+                } else {
+                    for (Constraint dep : deps) {
+                        visited.push(dep);
+                    }
+                }
+            }
+        }
+        return nonStaticBaseConstraints;
     }
 
     private record ConstraintWithConditions(Constraint constraint, List<EventGraph> sideConditions) {
