@@ -467,30 +467,29 @@ public class AxiomRefinementSolver extends RefinementSolver {
                     }
                 } else if (constraint instanceof Intersection intersection) {
                     final List<Relation> operands = intersection.getOperands();
-                    final List<EventGraph> localSideConditions = new ArrayList<>(operands.size() - 1);
-                    Relation mostUnknownRelation = null;
-                    EventGraph mostUnknownKnownElements = null;
-                    int mostUnknownSize = 0;
                     for (Relation operand : operands) {
                         final RelationAnalysis.Knowledge k = ra.getKnowledge(operand);
                         final EventGraph mayOperands = k.getMaySet();
                         final EventGraph mustOperands = k.getMustSet();
                         final int unknownSize = mayOperands.size() - mustOperands.size();
-                        if (unknownSize > mostUnknownSize) {
-                            if (mostUnknownRelation != null) {
-                                localSideConditions.add(mostUnknownKnownElements);
+                        if (unknownSize != 0) {
+                            final List<EventGraph> sideConditions = new ArrayList<>(constraintWithConditions.sideConditions);
+                            boolean hasEmptySideCondition = false;
+                            for (Relation otherOperand : operands) {
+                                if (operand != otherOperand) {
+                                    final EventGraph otherMustOperands = ra.getKnowledge(otherOperand).getMustSet();
+                                    if (!otherMustOperands.isEmpty()) {
+                                        sideConditions.add(otherMustOperands);
+                                    } else {
+                                        hasEmptySideCondition = true;
+                                        break;
+                                    }
+                                }
                             }
-                            mostUnknownRelation = operand;
-                            mostUnknownKnownElements = mustOperands;
-                            mostUnknownSize = unknownSize;
-                        } else {
-                            localSideConditions.add(mustOperands);
+                            if (!hasEmptySideCondition) {
+                                visited.push(new ConstraintWithConditions(operand.getDefinition(), sideConditions));
+                            }
                         }
-                    }
-                    if (mostUnknownRelation != null) {
-                        final List<EventGraph> sideConditions = new ArrayList<>(constraintWithConditions.sideConditions);
-                        sideConditions.addAll(localSideConditions);
-                        visited.push(new ConstraintWithConditions(mostUnknownRelation.getDefinition(), sideConditions));
                     }
                 }
             }
