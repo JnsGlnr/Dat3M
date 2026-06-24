@@ -167,15 +167,8 @@ public class AxiomRefinementSolver extends RefinementSolver {
         // The cut has to be encoded.
         wmmConstraintsToEncode.addAll(generateCut(memoryModel));
         // We want to encode all acyclicity axioms but without dependencies
-        final Map<Constraint, Constraint> constraintsToEazyConstraints = memoryModel.getAxioms().stream()
-                .filter(Acyclicity.class::isInstance)
-                .filter(not(wmmConstraintsToEncode::contains))
-                .collect(toMap(identity(), a -> new Acyclicity(a.getRelation(), a.isNegated(), a.isFlagged()) {
-                    @Override
-                    public List<? extends Relation> getConstrainedRelations() {
-                        return Collections.emptyList();
-                    }
-                }));
+        final Map<Constraint, Constraint> constraintsToEazyConstraints =
+                getConstraintsToEazyConstraints(memoryModel, wmmConstraintsToEncode, analysisContext);
         final Collection<Constraint> eazyConstraints = constraintsToEazyConstraints.values();
         wmmConstraintsToEncode.addAll(eazyConstraints);
         wmmConstraintsToEncode.addAll(getNonStaticBaseConstraints(constraintsToEazyConstraints.keySet(), analysisContext));
@@ -417,6 +410,21 @@ public class AxiomRefinementSolver extends RefinementSolver {
                 smtStatus, nativeTime, caatTime, refineTime, caatStatus,
                 refinementFormula, caatStats, inconsistencyReasons, inconsistencyImplications, observedEvents
         );
+    }
+
+    private Map<Constraint, Constraint> getConstraintsToEazyConstraints(Wmm memoryModel, Collection<Constraint> wmmConstraintsToEncode,
+                                                                        Context analysisContext) {
+        final RelationAnalysis ra = analysisContext.requires(RelationAnalysis.class);
+        return memoryModel.getAxioms().stream()
+                .filter(axiom -> !ra.getKnowledge(axiom.getRelation()).getMaySet().isEmpty())
+                .filter(Acyclicity.class::isInstance)
+                .filter(not(wmmConstraintsToEncode::contains))
+                .collect(toMap(identity(), a -> new Acyclicity(a.getRelation(), a.isNegated(), a.isFlagged()) {
+                    @Override
+                    public List<? extends Relation> getConstrainedRelations() {
+                        return Collections.emptyList();
+                    }
+                }));
     }
 
     private Collection<Constraint> getNonStaticBaseConstraints(Collection<Constraint> origEazyConstraints, Context analysisContext) {
