@@ -21,16 +21,18 @@ import java.util.*;
 public class EazyWMMSolver extends WMMSolver {
 
     private final TrivialImplications trivialImplications;
+    private final boolean computeCoreReasons;
 
-    private EazyWMMSolver(EncodingContext c, TrivialImplications trivialImplications)
+    private EazyWMMSolver(EncodingContext c, TrivialImplications trivialImplications, boolean computeCoreReasons)
             throws InvalidConfigurationException {
         super(c, new ExecutionGraph(c.getTask().getMemoryModel(), constraint -> c.isEncoded(constraint) && !trivialImplications.isEazy(constraint)));
         this.trivialImplications = trivialImplications;
+        this.computeCoreReasons = computeCoreReasons;
     }
 
-    public static EazyWMMSolver withContext(EncodingContext context, TrivialImplications trivialImplications)
+    public static EazyWMMSolver withContext(EncodingContext context, TrivialImplications trivialImplications, boolean computeCoreReasons)
             throws InvalidConfigurationException {
-        return new EazyWMMSolver(context, trivialImplications);
+        return new EazyWMMSolver(context, trivialImplications, computeCoreReasons);
     }
 
     public Result check(IREvaluator model) {
@@ -42,7 +44,7 @@ public class EazyWMMSolver extends WMMSolver {
 
         // ============== Run the CAATSolver ==============
         CAATSolver.Result caatResult = solver.simpleCheck(executionGraph.getCAATModel());
-        Result result = Result.fromCAATResult(caatResult);
+        Result result = Result.fromCAATResult(this, caatResult);
         Statistics stats = result.stats;
         stats.modelExtractionTime = extractTime;
         stats.modelSize = executionGraph.getDomain().size();
@@ -53,7 +55,7 @@ public class EazyWMMSolver extends WMMSolver {
             for (Constraint violatedConstraint : caatResult.getViolatedConstraints()) {
                 if (violatedConstraint instanceof AcyclicityConstraint) {
                     eazyConstraints.add(violatedConstraint);
-                } else {
+                } else if (computeCoreReasons) {
                     lazyConstraints.add(violatedConstraint);
                 }
             }
@@ -64,13 +66,17 @@ public class EazyWMMSolver extends WMMSolver {
             stats.numComputedCoreImplications = result.coreImplications.getSize();
             stats.coreImplicationComputationTime = System.currentTimeMillis() - curTime;
 
-            // ============== Compute Core reasons ==============
-            curTime = System.currentTimeMillis();
-            Set<Conjunction<CoreLiteral>> coreReasons = reasoner.toCoreReasons(solver.computeInconsistencyReasons(lazyConstraints));
-            stats.numComputedCoreReasons = coreReasons.size();
-            result.coreReasons = new DNF<>(coreReasons);
-            stats.numComputedReducedCoreReasons = result.coreReasons.getNumberOfCubes();
-            stats.coreReasonComputationTime = System.currentTimeMillis() - curTime;
+            if (computeCoreReasons) {
+                // ============== Compute Core reasons ==============
+                curTime = System.currentTimeMillis();
+                Set<Conjunction<CoreLiteral>> coreReasons = reasoner.toCoreReasons(solver.computeInconsistencyReasons(lazyConstraints));
+                stats.numComputedCoreReasons = coreReasons.size();
+                result.coreReasons = new DNF<>(coreReasons);
+                stats.numComputedReducedCoreReasons = result.coreReasons.getNumberOfCubes();
+                stats.coreReasonComputationTime = System.currentTimeMillis() - curTime;
+            } else {
+                result.coreReasons = DNF.FALSE();
+            }
         }
 
         return result;
@@ -79,17 +85,17 @@ public class EazyWMMSolver extends WMMSolver {
 
     // ===================== Classes ======================
 
-    public static class Result extends WMMSolver.Result {
+    public class Result extends WMMSolver.Result {
         private Conjunction<CoreImplication> coreImplications;
         private Statistics stats;
 
         public Conjunction<CoreImplication> getCoreImplications() { return coreImplications; }
         public Statistics getStatistics() { return stats; }
 
-        static Result fromCAATResult(CAATSolver.Result caatResult) {
-            Result result = new Result();
+        static Result fromCAATResult(EazyWMMSolver wmmSolver, CAATSolver.Result caatResult) {
+            Result result = wmmSolver.new Result();
             result.status = caatResult.getStatus();
-            result.stats = new Statistics();
+            result.stats = wmmSolver.new Statistics();
             result.stats.caatStats = caatResult.getStatistics();
 
             return result;
@@ -98,13 +104,13 @@ public class EazyWMMSolver extends WMMSolver {
         @Override
         public String toString() {
             return status + "\n" +
-                    coreReasons + "\n" +
+                    (computeCoreReasons ? coreReasons + "\n" : "") +
                     coreImplications + "\n" +
                     stats;
         }
     }
 
-    public static class Statistics extends WMMSolver.Statistics {
+    public class Statistics extends WMMSolver.Statistics {
         CAATSolver.Statistics caatStats;
         long modelExtractionTime;
         long coreReasonComputationTime;
@@ -134,17 +140,21 @@ public class EazyWMMSolver extends WMMSolver {
             str.append("Model extraction time(ms): ").append(getModelExtractionTime()).append("\n");
             str.append("Population time(ms): ").append(getPopulationTime()).append("\n");
             str.append("Consistency check time(ms): ").append(getConsistencyCheckTime()).append("\n");
-            str.append("Base Reason computation time(ms): ").append(getBaseReasonComputationTime()).append("\n");
-            str.append("Core Reason computation time(ms): ").append(getCoreReasonComputationTime()).append("\n");
+            if (computeCoreReasons) {
+                str.append("Base Reason computation time(ms): ").append(getBaseReasonComputationTime()).append("\n");
+                str.append("Core Reason computation time(ms): ").append(getCoreReasonComputationTime()).append("\n");
+            }
             str.append("Core Implication computation time(ms): ").append(getBaseImplicationComputationTime())
                     .append("\n");
             str.append("Core Implication computation time(ms): ").append(getCoreImplicationComputationTime())
                     .append("\n");
             str.append("Model size (#events): ").append(getModelSize()).append("\n");
-            str.append("#Computed reasons (base/core): ").append(getNumComputedBaseReasons())
-                    .append("/").append(getNumComputedCoreReasons()).append("\n");
-            str.append("#Computed reduced reasons (base/core): ").append(getNumComputedReducedBaseReasons())
-                    .append("/").append(getNumComputedReducedCoreReasons()).append("\n");
+            if (computeCoreReasons) {
+                str.append("#Computed reasons (base/core): ").append(getNumComputedBaseReasons())
+                        .append("/").append(getNumComputedCoreReasons()).append("\n");
+                str.append("#Computed reduced reasons (base/core): ").append(getNumComputedReducedBaseReasons())
+                        .append("/").append(getNumComputedReducedCoreReasons()).append("\n");
+            }
             str.append("#Computed implications (base/core): ").append(getNumComputedBaseImplications())
                     .append("/").append(getNumComputedCoreImplications()).append("\n");
             return str.toString();
