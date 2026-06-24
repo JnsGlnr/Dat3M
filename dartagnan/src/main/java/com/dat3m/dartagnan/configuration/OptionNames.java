@@ -67,6 +67,9 @@ public class OptionNames {
     public static final String RELATION_ANALYSIS = "wmm.analysis.relationAnalysis";
     public static final String ENABLE_EXTENDED_RELATION_ANALYSIS = "wmm.analysis.extendedRelationAnalysis";
 
+    // Axiom Refinement Options
+    public static final String BASE_METHOD = "axiomRefinement.baseMethod";
+
     // Refinement Options
     public static final String BASELINE = "refinement.baseline";
     public static final String SYMMETRIC_LEARNING = "refinement.symmetricLearning";

@@ -1,5 +1,6 @@
 package com.dat3m.dartagnan.verification.solving;
 
+import com.dat3m.dartagnan.configuration.Method;
 import com.dat3m.dartagnan.configuration.Property;
 import com.dat3m.dartagnan.encoding.*;
 import com.dat3m.dartagnan.program.Program;
@@ -31,6 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sosy_lab.common.configuration.Configuration;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
+import org.sosy_lab.common.configuration.Option;
+import org.sosy_lab.common.configuration.Options;
 import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 import org.sosy_lab.java_smt.api.SolverContext;
@@ -39,6 +42,7 @@ import org.sosy_lab.java_smt.api.SolverException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.dat3m.dartagnan.configuration.OptionNames.BASE_METHOD;
 import static com.dat3m.dartagnan.solver.caat.CAATSolver.Status.*;
 import static com.dat3m.dartagnan.utils.Result.*;
 import static com.dat3m.dartagnan.utils.Utils.toTimeString;
@@ -56,9 +60,19 @@ import static java.util.stream.Collectors.toMap;
         - refines the derivation of axioms from base relations if the found execution was inconsistent, using the
           explanations provided by the theory solver.
  */
+@Options
 public class AxiomRefinementSolver extends RefinementSolver {
 
     private static final Logger logger = LoggerFactory.getLogger(AxiomRefinementSolver.class);
+
+    // ================================================================================================================
+    // Configuration
+
+    @Option(name=BASE_METHOD,
+            description="Used method to solve all non-eazy constraints.",
+            secure=true,
+            toUppercase=true)
+    private Method baseMethod = Method.getDefault();
 
     // ================================================================================================================
     // Data classes
@@ -119,6 +133,10 @@ public class AxiomRefinementSolver extends RefinementSolver {
 
     private AxiomRefinementSolver(VerificationTask task) throws InvalidConfigurationException {
         super(task);
+        task.getConfig().inject(this);
+        if (baseMethod == Method.EAZY) {
+            throw new UnsupportedOperationException(BASE_METHOD + " \"" + Method.EAZY.name() + "\" is not supported");
+        }
     }
 
     public static AxiomRefinementSolver create(VerificationTask task) throws InvalidConfigurationException  {
@@ -160,6 +178,11 @@ public class AxiomRefinementSolver extends RefinementSolver {
         final Collection<Constraint> eazyConstraints = constraintsToEazyConstraints.values();
         wmmConstraintsToEncode.addAll(eazyConstraints);
         wmmConstraintsToEncode.addAll(getNonStaticBaseConstraints(constraintsToEazyConstraints.keySet(), analysisContext));
+        if (baseMethod == Method.EAGER) {
+            wmmConstraintsToEncode.addAll(memoryModel.getAxioms().stream()
+                    .filter(not(eazyConstraints::contains))
+                    .toList());
+        }
 
         // ------------------------ Encoding ------------------------
         initSMTSolver(config);
@@ -174,7 +197,8 @@ public class AxiomRefinementSolver extends RefinementSolver {
         final SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
 
         final BooleanFormulaManager bmgr = ctx.getFormulaManager().getBooleanFormulaManager();
-        final EazyWMMSolver solver = EazyWMMSolver.withContext(context, trivialImplications);
+        final boolean computeCoreReasons = baseMethod == Method.LAZY;
+        final EazyWMMSolver solver = EazyWMMSolver.withContext(context, trivialImplications, computeCoreReasons);
         final EazyRefiner refiner = EazyRefiner.newInstance();
         final Property.Type propertyType = Property.getCombinedType(task.getProperty(), task);
 
@@ -256,7 +280,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
         // -------------------------- Report statistics summary --------------------------
 
         if (logger.isInfoEnabled()) {
-            logger.info(generateSummary(combinedTrace, boundCheckTime));
+            logger.info(generateSummary(combinedTrace, boundCheckTime, computeCoreReasons));
         }
 
         if (logger.isDebugEnabled()) {
@@ -501,7 +525,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
     // ================================================================================================================
     // Statistics & Debugging
 
-    private static String generateSummary(RefinementTrace trace, long boundCheckTime) {
+    private static String generateSummary(RefinementTrace trace, long boundCheckTime, boolean hasReasons) {
         final List<EazyWMMSolver.Statistics> statList = trace.iterations.stream()
                 .filter(iter -> iter.caatStats != null).map(RefinementIteration::caatStats).toList();
         final long totalNativeSolvingTime = trace.getNativeSmtTime();
@@ -524,11 +548,13 @@ public class AxiomRefinementSolver extends RefinementSolver {
             totalModelExtractTime += stats.getModelExtractionTime();
             totalPopulationTime += stats.getPopulationTime();
             totalConsistencyCheckTime += stats.getConsistencyCheckTime();
-            totalReasonComputationTime += stats.getBaseReasonComputationTime() + stats.getCoreReasonComputationTime();
+            if (hasReasons) {
+                totalReasonComputationTime += stats.getBaseReasonComputationTime() + stats.getCoreReasonComputationTime();
+                totalNumReasons += stats.getNumComputedCoreReasons();
+                totalNumReducedReasons += stats.getNumComputedReducedCoreReasons();
+            }
             totalImplicationComputationTime +=
                     stats.getBaseImplicationComputationTime() + stats.getCoreImplicationComputationTime();
-            totalNumReasons += stats.getNumComputedCoreReasons();
-            totalNumReducedReasons += stats.getNumComputedReducedCoreReasons();
             totalNumImplications += stats.getNumComputedCoreImplications();
 
             totalModelSize += stats.getModelSize();
@@ -543,15 +569,19 @@ public class AxiomRefinementSolver extends RefinementSolver {
                 .append("   -- Bound check time: ").append(toTimeString(boundCheckTime)).append("\n")
                 .append("Total CAAT solving time: ").append(toTimeString(totalCaatTime)).append("\n")
                 .append("   -- Model extraction time: ").append(toTimeString(totalModelExtractTime)).append("\n")
-                .append("   -- Population time: ").append(toTimeString(totalPopulationTime)).append("\n")
-                .append("   -- Consistency check time: ").append(toTimeString(totalConsistencyCheckTime)).append("\n")
-                .append("   -- Reason computation time: ").append(toTimeString(totalReasonComputationTime)).append("\n")
-                .append("   -- Implication computation time: ")
+                .append("   -- Population time: ").append(toTimeString(totalPopulationTime)).append("\n");
+        if (hasReasons) {
+            message.append("   -- Consistency check time: ").append(toTimeString(totalConsistencyCheckTime)).append("\n")
+                    .append("   -- Reason computation time: ").append(toTimeString(totalReasonComputationTime)).append("\n");
+        }
+        message.append("   -- Implication computation time: ")
                 .append(toTimeString(totalImplicationComputationTime)).append("\n")
-                .append("   -- Refining time: ").append(toTimeString(totalRefiningTime)).append("\n")
-                .append("   -- #Computed core reasons: ").append(totalNumReasons).append("\n")
-                .append("   -- #Computed core reduced reasons: ").append(totalNumReducedReasons).append("\n")
-                .append("   -- #Computed core implications: ").append(totalNumImplications).append("\n");
+                .append("   -- Refining time: ").append(toTimeString(totalRefiningTime)).append("\n");
+        if (hasReasons) {
+            message.append("   -- #Computed core reasons: ").append(totalNumReasons).append("\n")
+                    .append("   -- #Computed core reduced reasons: ").append(totalNumReducedReasons).append("\n");
+        }
+        message.append("   -- #Computed core implications: ").append(totalNumImplications).append("\n");
         if (!statList.isEmpty()) {
             message.append("   -- Min model size (#events): ").append(minModelSize).append("\n")
                     .append("   -- Average model size (#events): ").append(totalModelSize / statList.size())
