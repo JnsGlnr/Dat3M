@@ -26,6 +26,7 @@ import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
 import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.definition.*;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
+import com.dat3m.dartagnan.wmm.utils.graph.mutable.MapEventGraph;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
@@ -511,6 +512,42 @@ public class AxiomRefinementSolver extends RefinementSolver {
                                 }
                             }
                             if (!hasEmptySideCondition) {
+                                visited.push(new ConstraintWithConditions(operand.getDefinition(), sideConditions));
+                            }
+                        }
+                    }
+                } else if (constraint instanceof Composition composition) {
+                    final Relation left = composition.getLeftOperand();
+                    final Relation right = composition.getRightOperand();
+                    for (Relation operand : new Relation[] {left, right}) {
+                        final RelationAnalysis.Knowledge k = ra.getKnowledge(operand);
+                        final EventGraph mayOperands = k.getMaySet();
+                        final EventGraph mustOperands = k.getMustSet();
+                        final int unknownSize = mayOperands.size() - mustOperands.size();
+                        if (unknownSize != 0) {
+                            final boolean isLeft = operand == left;
+                            final EventGraph otherMustOperands = ra.getKnowledge(isLeft ? right : left).getMustSet();
+                            final Map<Event, Set<Event>> mayMap = isLeft ? mayOperands.getInMap() : mayOperands.getOutMap();
+                            final Map<Event, Set<Event>> localSideConditions = new HashMap<>();
+                            for (Event otherMustOperand : otherMustOperands.getDomain()) {
+                                if (otherMustOperands.contains(otherMustOperand, otherMustOperand)) {
+                                    final Set<Event> maySet = mayMap.get(otherMustOperand);
+                                    if (maySet != null) {
+                                        for (Event mayOperand : maySet) {
+                                            if (isLeft) {
+                                                localSideConditions.computeIfAbsent(mayOperand, key -> new HashSet<>())
+                                                        .add(otherMustOperand);
+                                            } else {
+                                                localSideConditions.computeIfAbsent(otherMustOperand, key -> new HashSet<>())
+                                                        .add(mayOperand);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (!localSideConditions.isEmpty()) {
+                                final List<EventGraph> sideConditions = new ArrayList<>(constraintWithConditions.sideConditions);
+                                sideConditions.add(new MapEventGraph(localSideConditions));
                                 visited.push(new ConstraintWithConditions(operand.getDefinition(), sideConditions));
                             }
                         }
