@@ -432,23 +432,26 @@ public class AxiomRefinementSolver extends RefinementSolver {
     private Collection<Constraint> getNonStaticBaseConstraints(Collection<Constraint> origEazyConstraints, Context analysisContext) {
         final RelationAnalysis ra = analysisContext.requires(RelationAnalysis.class);
         final Collection<Constraint> nonStaticBaseConstraints = new ArrayList<>();
+        final Set<Constraint> visited = new HashSet<>();
         for (Constraint eazyConstraint : origEazyConstraints) {
-            final Deque<Constraint> visited = new ArrayDeque<>();
-            visited.push(eazyConstraint);
-            while (!visited.isEmpty()) {
-                final Constraint constraint = visited.pop();
-                final Collection<? extends Constraint> deps = Wmm.computeConstraintDependencies(constraint);
-                if (deps.isEmpty()) {
-                    if (!nonStaticBaseConstraints.contains(constraint)) {
-                        final Relation baseRel = constraint.getConstrainedRelations().get(0);
-                        final RelationAnalysis.Knowledge k = ra.getKnowledge(baseRel);
-                        if (k.getMaySet().size() != k.getMustSet().size()) {
-                            nonStaticBaseConstraints.add(constraint);
+            final Deque<Constraint> visitingStack = new ArrayDeque<>();
+            visitingStack.push(eazyConstraint);
+            while (!visitingStack.isEmpty()) {
+                final Constraint constraint = visitingStack.pop();
+                if (visited.add(constraint)) {
+                    final Collection<? extends Constraint> deps = Wmm.computeConstraintDependencies(constraint);
+                    if (deps.isEmpty()) {
+                        if (!nonStaticBaseConstraints.contains(constraint)) {
+                            final Relation baseRel = constraint.getConstrainedRelations().get(0);
+                            final RelationAnalysis.Knowledge k = ra.getKnowledge(baseRel);
+                            if (k.getMaySet().size() != k.getMustSet().size()) {
+                                nonStaticBaseConstraints.add(constraint);
+                            }
                         }
-                    }
-                } else {
-                    for (Constraint dep : deps) {
-                        visited.push(dep);
+                    } else {
+                        for (Constraint dep : deps) {
+                            visitingStack.push(dep);
+                        }
                     }
                 }
             }
@@ -463,6 +466,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
         final RelationAnalysis ra = context.getAnalysisContext().requires(RelationAnalysis.class);
         final Map<Relation, Map<Relation, Map<Event, List<Event>>>> result = new HashMap<>();
         for (Constraint eazyConstraint : eazyConstraints) {
+            final Set<Constraint> visited = new HashSet<>();
             final Map<Relation, Map<Event, List<Event>>> trivialImplications = new HashMap<>();
             if (eazyConstraint instanceof Axiom eazyAxiom) {
                 eazyConstraint = eazyAxiom.getRelation().getDefinition();
@@ -472,93 +476,95 @@ public class AxiomRefinementSolver extends RefinementSolver {
             final EventGraph must = ra.getKnowledge(eazyRel).getMustSet();
 
             final List<Constraint> foundConstraints = new ArrayList<>();
-            final Deque<ConstraintWithConditions> visited = new ArrayDeque<>();
-            visited.add(new ConstraintWithConditions(eazyConstraint, new ArrayList<>()));
-            while (!visited.isEmpty()) {
-                final ConstraintWithConditions constraintWithConditions = visited.pop();
+            final Deque<ConstraintWithConditions> visitingStack = new ArrayDeque<>();
+            visitingStack.add(new ConstraintWithConditions(eazyConstraint, new ArrayList<>()));
+            while (!visitingStack.isEmpty()) {
+                final ConstraintWithConditions constraintWithConditions = visitingStack.pop();
                 final Constraint constraint = constraintWithConditions.constraint;
-                if (context.isEncoded(constraint)) {
-                    if (!foundConstraints.contains(constraint)) {
-                        final Definition def = (Definition) constraint;
-                        final Relation rel = def.getDefinedRelation();
-                        final Map<Event, List<Event>> events = new HashMap<>();
-                        ra.getKnowledge(rel).getMaySet().apply((e1, e2) -> {
-                            if (!must.contains(e1, e2)) {
-                                for (EventGraph sideCondition : constraintWithConditions.sideConditions) {
-                                    if (!sideCondition.contains(e1, e2)) {
-                                        return;
+                if (visited.add(constraint)) {
+                    if (context.isEncoded(constraint)) {
+                        if (!foundConstraints.contains(constraint)) {
+                            final Definition def = (Definition) constraint;
+                            final Relation rel = def.getDefinedRelation();
+                            final Map<Event, List<Event>> events = new HashMap<>();
+                            ra.getKnowledge(rel).getMaySet().apply((e1, e2) -> {
+                                if (!must.contains(e1, e2)) {
+                                    for (EventGraph sideCondition : constraintWithConditions.sideConditions) {
+                                        if (!sideCondition.contains(e1, e2)) {
+                                            return;
+                                        }
+                                    }
+                                    events.computeIfAbsent(e1, k -> new ArrayList<>()).add(e2);
+                                }
+                            });
+                            trivialImplications.put(rel, events);
+                            foundConstraints.add(constraint);
+                        }
+                    } else if (constraint instanceof Union || constraint instanceof SetIdentity
+                            || constraint instanceof TransitiveClosure) {
+                        for (Constraint dep : Wmm.computeConstraintDependencies(constraint)) {
+                            visitingStack.push(new ConstraintWithConditions(dep, constraintWithConditions.sideConditions));
+                        }
+                    } else if (constraint instanceof Intersection intersection) {
+                        final List<Relation> operands = intersection.getOperands();
+                        for (Relation operand : operands) {
+                            final RelationAnalysis.Knowledge k = ra.getKnowledge(operand);
+                            final EventGraph mayOperands = k.getMaySet();
+                            final EventGraph mustOperands = k.getMustSet();
+                            final int unknownSize = mayOperands.size() - mustOperands.size();
+                            if (unknownSize != 0) {
+                                final List<EventGraph> sideConditions = new ArrayList<>(constraintWithConditions.sideConditions);
+                                boolean hasEmptySideCondition = false;
+                                for (Relation otherOperand : operands) {
+                                    if (operand != otherOperand) {
+                                        final EventGraph otherMustOperands = ra.getKnowledge(otherOperand).getMustSet();
+                                        if (!otherMustOperands.isEmpty()) {
+                                            sideConditions.add(otherMustOperands);
+                                        } else {
+                                            hasEmptySideCondition = true;
+                                            break;
+                                        }
                                     }
                                 }
-                                events.computeIfAbsent(e1, k -> new ArrayList<>()).add(e2);
-                            }
-                        });
-                        trivialImplications.put(rel, events);
-                        foundConstraints.add(constraint);
-                    }
-                } else if (constraint instanceof Union || constraint instanceof SetIdentity
-                        || constraint instanceof TransitiveClosure) {
-                    for (Constraint dep : Wmm.computeConstraintDependencies(constraint)) {
-                        visited.push(new ConstraintWithConditions(dep, constraintWithConditions.sideConditions));
-                    }
-                } else if (constraint instanceof Intersection intersection) {
-                    final List<Relation> operands = intersection.getOperands();
-                    for (Relation operand : operands) {
-                        final RelationAnalysis.Knowledge k = ra.getKnowledge(operand);
-                        final EventGraph mayOperands = k.getMaySet();
-                        final EventGraph mustOperands = k.getMustSet();
-                        final int unknownSize = mayOperands.size() - mustOperands.size();
-                        if (unknownSize != 0) {
-                            final List<EventGraph> sideConditions = new ArrayList<>(constraintWithConditions.sideConditions);
-                            boolean hasEmptySideCondition = false;
-                            for (Relation otherOperand : operands) {
-                                if (operand != otherOperand) {
-                                    final EventGraph otherMustOperands = ra.getKnowledge(otherOperand).getMustSet();
-                                    if (!otherMustOperands.isEmpty()) {
-                                        sideConditions.add(otherMustOperands);
-                                    } else {
-                                        hasEmptySideCondition = true;
-                                        break;
-                                    }
+                                if (!hasEmptySideCondition) {
+                                    visitingStack.push(new ConstraintWithConditions(operand.getDefinition(), sideConditions));
                                 }
-                            }
-                            if (!hasEmptySideCondition) {
-                                visited.push(new ConstraintWithConditions(operand.getDefinition(), sideConditions));
                             }
                         }
-                    }
-                } else if (constraint instanceof Composition composition) {
-                    final Relation left = composition.getLeftOperand();
-                    final Relation right = composition.getRightOperand();
-                    for (Relation operand : new Relation[] {left, right}) {
-                        final RelationAnalysis.Knowledge k = ra.getKnowledge(operand);
-                        final EventGraph mayOperands = k.getMaySet();
-                        final EventGraph mustOperands = k.getMustSet();
-                        final int unknownSize = mayOperands.size() - mustOperands.size();
-                        if (unknownSize != 0) {
-                            final boolean isLeft = operand == left;
-                            final EventGraph otherMustOperands = ra.getKnowledge(isLeft ? right : left).getMustSet();
-                            final Map<Event, Set<Event>> mayMap = isLeft ? mayOperands.getInMap() : mayOperands.getOutMap();
-                            final Map<Event, Set<Event>> localSideConditions = new HashMap<>();
-                            for (Event otherMustOperand : otherMustOperands.getDomain()) {
-                                if (otherMustOperands.contains(otherMustOperand, otherMustOperand)) {
-                                    final Set<Event> maySet = mayMap.get(otherMustOperand);
-                                    if (maySet != null) {
-                                        for (Event mayOperand : maySet) {
-                                            if (isLeft) {
-                                                localSideConditions.computeIfAbsent(mayOperand, key -> new HashSet<>())
-                                                        .add(otherMustOperand);
-                                            } else {
-                                                localSideConditions.computeIfAbsent(otherMustOperand, key -> new HashSet<>())
-                                                        .add(mayOperand);
+                    } else if (constraint instanceof Composition composition) {
+                        final Relation left = composition.getLeftOperand();
+                        final Relation right = composition.getRightOperand();
+                        for (Relation operand : new Relation[] {left, right}) {
+                            final RelationAnalysis.Knowledge k = ra.getKnowledge(operand);
+                            final EventGraph mayOperands = k.getMaySet();
+                            final EventGraph mustOperands = k.getMustSet();
+                            final int unknownSize = mayOperands.size() - mustOperands.size();
+                            if (unknownSize != 0) {
+                                final boolean isLeft = operand == left;
+                                final EventGraph otherMustOperands = ra.getKnowledge(isLeft ? right : left).getMustSet();
+                                final Map<Event, Set<Event>> mayMap = isLeft ? mayOperands.getInMap() : mayOperands.getOutMap();
+                                final Map<Event, Set<Event>> localSideConditions = new HashMap<>();
+                                for (Event otherMustOperand : otherMustOperands.getDomain()) {
+                                    if (otherMustOperands.contains(otherMustOperand, otherMustOperand)) {
+                                        final Set<Event> maySet = mayMap.get(otherMustOperand);
+                                        if (maySet != null) {
+                                            for (Event mayOperand : maySet) {
+                                                if (isLeft) {
+                                                    localSideConditions.computeIfAbsent(mayOperand, key -> new HashSet<>())
+                                                            .add(otherMustOperand);
+                                                } else {
+                                                    localSideConditions.computeIfAbsent(otherMustOperand, key -> new HashSet<>())
+                                                            .add(mayOperand);
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
-                            if (!localSideConditions.isEmpty()) {
-                                final List<EventGraph> sideConditions = new ArrayList<>(constraintWithConditions.sideConditions);
-                                sideConditions.add(new MapEventGraph(localSideConditions));
-                                visited.push(new ConstraintWithConditions(operand.getDefinition(), sideConditions));
+                                if (!localSideConditions.isEmpty()) {
+                                    final List<EventGraph> sideConditions = new ArrayList<>(constraintWithConditions.sideConditions);
+                                    sideConditions.add(new MapEventGraph(localSideConditions));
+                                    visitingStack.push(new ConstraintWithConditions(operand.getDefinition(), sideConditions));
+                                }
                             }
                         }
                     }
