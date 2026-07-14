@@ -298,7 +298,7 @@ public class WmmEncoder {
         return activeSetAnalysis.getActiveSet(definition);
     }
 
-    private EventGraph getRelevantSet(Axiom axiom) {
+    public EventGraph getRelevantSet(Axiom axiom) {
         return activeSetAnalysis.getRelevantSet(axiom);
     }
 

@@ -3,12 +3,13 @@ package com.dat3m.dartagnan.configuration;
 import java.util.Arrays;
 
 public enum Method implements OptionInterface {
-    EAGER, EAZY, LAZY;
+    EAGER, EAZY, LAZY, PROPAGATOR;
 
     // Used for options in the console
     @Override
     public String asStringOption() {
         return switch (this) {
+            case PROPAGATOR -> "propagator";
             case EAGER -> "eager";
             case EAZY -> "eazy";
             case LAZY -> "lazy";
@@ -19,6 +20,7 @@ public enum Method implements OptionInterface {
     @Override
     public String toString() {
         return switch (this) {
+            case PROPAGATOR -> "Propagator analysis";
             case EAGER -> "Eager analysis";
             case EAZY -> "Hybrid eager-lazy analysis";
             case LAZY -> "Lazy analysis";
