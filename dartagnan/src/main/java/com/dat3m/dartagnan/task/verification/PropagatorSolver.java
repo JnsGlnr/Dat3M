@@ -3,7 +3,7 @@ package com.dat3m.dartagnan.task.verification;
 import com.dat3m.dartagnan.configuration.Property;
 import com.dat3m.dartagnan.encoding.*;
 import com.dat3m.dartagnan.smt.ProverWithTracker;
-import com.dat3m.dartagnan.solver.propagators.AcyclicityPropagator;
+import com.dat3m.dartagnan.solver.propagators.AcyclicityPropagatorNew;
 import com.dat3m.dartagnan.task.SMTModelChecker;
 import com.dat3m.dartagnan.task.Context;
 import com.dat3m.dartagnan.task.Task;
@@ -73,7 +73,8 @@ public class PropagatorSolver extends SMTModelChecker<VerificationTask> implemen
         SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
 
         System.out.println("Propagating axioms: " + axiomsToPropagate);
-        AcyclicityPropagator propagator = new AcyclicityPropagator(wmmEncoder, context);
+        //AcyclicityPropagator propagator = new AcyclicityPropagator(wmmEncoder, context);
+        AcyclicityPropagatorNew propagator = new AcyclicityPropagatorNew(wmmEncoder, context);
         axiomsToPropagate.forEach(propagator::registerAxiom);
         prover.registerUserPropagator(propagator);
 
