@@ -21,6 +21,7 @@ public interface PredicateVisitor<TRet, TData, TContext> {
     default TRet visitTransitiveClosure(RelationGraph graph, TData data, TContext context) { return visitGraph(graph, data, context); }
     default TRet visitRecursiveGraph(RelationGraph graph, TData data, TContext context) { return visitGraph(graph, data, context); }
     default TRet visitBaseGraph(RelationGraph graph, TData data, TContext context) { return visitGraph(graph, data, context); }
+    default TRet visitTrivialGraph(RelationGraph graph, TData data, TContext context) { return visitGraph(graph, data, context); }
 
     // ============================================== SetPredicates ==============================================
 

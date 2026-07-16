@@ -88,6 +88,7 @@ public class WmmEncoder {
         logger.info("{}: {}", IDL_TO_SAT, useSATEncoding);
 
         this.activeSetAnalysis = ActiveSetAnalysis.newInstance(ctx.getTask(), ctx.getAnalysisContext());
+        ctx.getAnalysisContext().register(ActiveSetAnalysis.class, activeSetAnalysis);
     }
 
     public static WmmEncoder withContext(EncodingContext context) throws InvalidConfigurationException {

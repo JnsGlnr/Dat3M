@@ -8,9 +8,12 @@ import com.dat3m.dartagnan.solver.caat.predicates.Derivable;
 import com.dat3m.dartagnan.solver.caat.predicates.misc.PredicateVisitor;
 import com.dat3m.dartagnan.solver.caat.predicates.relationGraphs.Edge;
 import com.dat3m.dartagnan.solver.caat.predicates.relationGraphs.RelationGraph;
+import com.dat3m.dartagnan.solver.caat.predicates.relationGraphs.derived.IntersectionGraph;
 import com.dat3m.dartagnan.solver.caat.predicates.sets.derived.ProjectionSet;
 import com.dat3m.dartagnan.solver.caat.predicates.sets.Element;
 import com.dat3m.dartagnan.solver.caat.predicates.sets.SetPredicate;
+import com.dat3m.dartagnan.solver.caat4wmm.basePredicates.ActiveGraph;
+import com.dat3m.dartagnan.solver.caat4wmm.basePredicates.MayGraph;
 import com.dat3m.dartagnan.utils.logic.Conjunction;
 import com.dat3m.dartagnan.utils.logic.DNF;
 
@@ -70,6 +73,12 @@ public class Reasoner {
         }
 
         CAATPredicate pred = constraint.getConstrainedPredicate();
+        if (pred instanceof IntersectionGraph intersection) {
+            List<RelationGraph> dependencies = intersection.getDependencies();
+            if (dependencies.size() == 2 && dependencies.get(1) instanceof ActiveGraph) {
+                pred = dependencies.get(0);
+            }
+        }
         Collection<? extends Collection<? extends Derivable>> violations = constraint.getViolations();
         List<CAATImplication> reasonList = new ArrayList<>();
 
@@ -248,7 +257,7 @@ public class Reasoner {
             }
 
             Conjunction<CAATLiteral> reason = computeReason(lhs, edge)
-                    .and(new EdgeLiteral(rhs, edge, false).toSingletonReason());
+                    .and(rhs instanceof MayGraph ? Conjunction.TRUE() : new EdgeLiteral(rhs, edge, false).toSingletonReason());
             assert !reason.isFalse();
             return reason;
         }
@@ -303,6 +312,11 @@ public class Reasoner {
         @Override
         public Conjunction<CAATLiteral> visitBaseGraph(RelationGraph graph, Edge edge, Void unused) {
             return new EdgeLiteral(graph, edge, true).toSingletonReason();
+        }
+
+        @Override
+        public Conjunction<CAATLiteral> visitTrivialGraph(RelationGraph graph, Edge edge, Void unused) {
+            return Conjunction.TRUE();
         }
     }
 
