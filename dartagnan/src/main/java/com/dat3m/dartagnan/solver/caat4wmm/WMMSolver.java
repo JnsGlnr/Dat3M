@@ -24,7 +24,7 @@ public class WMMSolver {
     protected final CoreReasoner reasoner;
 
     WMMSolver(EncodingContext c) throws InvalidConfigurationException {
-        this(c, new ExecutionGraph(c.getTask().getMemoryModel(), c::isEncoded));
+        this(c, new ExecutionGraph(c.getTask().getMemoryModel(), c::isEncoded, a -> false));
     }
 
     WMMSolver(EncodingContext c, ExecutionGraph graph) throws InvalidConfigurationException {
