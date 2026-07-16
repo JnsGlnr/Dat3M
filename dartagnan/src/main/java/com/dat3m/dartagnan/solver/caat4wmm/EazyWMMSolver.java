@@ -25,7 +25,8 @@ public class EazyWMMSolver extends WMMSolver {
 
     private EazyWMMSolver(EncodingContext c, TrivialImplications trivialImplications, boolean computeCoreReasons)
             throws InvalidConfigurationException {
-        super(c, new ExecutionGraph(c.getTask().getMemoryModel(), constraint -> c.isEncoded(constraint) && !trivialImplications.isEazy(constraint)));
+        super(c, new ExecutionGraph(c.getTask().getMemoryModel(), constraint -> c.isEncoded(constraint) && !trivialImplications.isEazy(constraint),
+                trivialImplications::isEazy));
         this.trivialImplications = trivialImplications;
         this.computeCoreReasons = computeCoreReasons;
     }

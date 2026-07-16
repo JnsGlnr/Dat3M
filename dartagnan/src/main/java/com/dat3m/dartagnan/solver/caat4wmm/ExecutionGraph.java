@@ -30,10 +30,7 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Maps;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Predicate;
 
 public class ExecutionGraph {
@@ -46,6 +43,7 @@ public class ExecutionGraph {
 
     private final Wmm memoryModel;
     private final Predicate<? super com.dat3m.dartagnan.wmm.Constraint> encodedConstraints;
+    private final Predicate<? super Axiom> activeAxioms;
     private final BiMap<Relation, CAATPredicate> predicateToRelationMap = HashBiMap.create();
     private final BiMap<Axiom, Constraint> constraintMap = HashBiMap.create();
 
@@ -56,9 +54,10 @@ public class ExecutionGraph {
 
     // ============= Construction & Init ===============
 
-    public ExecutionGraph(Wmm model, Predicate<? super com.dat3m.dartagnan.wmm.Constraint> encoded) {
+    public ExecutionGraph(Wmm model, Predicate<? super com.dat3m.dartagnan.wmm.Constraint> encoded, Predicate<? super Axiom> active) {
         memoryModel = Preconditions.checkNotNull(model);
         encodedConstraints = Preconditions.checkNotNull(encoded);
+        activeAxioms = Preconditions.checkNotNull(active);
         constructMappings();
     }
 
@@ -109,8 +108,7 @@ public class ExecutionGraph {
             if (axiom.isFlagged() || axiom.isNegated() || encodedConstraints.test(axiom)) {
                 continue;
             }
-            Constraint constraint = getOrCreateConstraintFromAxiom(axiom);
-            constraints.add(constraint);
+            constraints.addAll(getOrCreateConstraintFromAxiom(axiom));
         }
 
         caatModel = CAATModel.from(graphs, constraints);
@@ -172,28 +170,45 @@ public class ExecutionGraph {
 
     //=================== Reading the WMM ====================
 
-    private Constraint getOrCreateConstraintFromAxiom(Axiom axiom) {
+    private List<Constraint> getOrCreateConstraintFromAxiom(Axiom axiom) {
         if (constraintMap.containsKey(axiom)) {
-            return constraintMap.get(axiom);
+            return Collections.singletonList(constraintMap.get(axiom));
         }
 
-        Constraint constraint;
-        Relation inner = axiom.getRelation();
-        CAATPredicate innerPred = inner.isSet() ?
+        final List<Constraint> constraints = new ArrayList<>(2);
+        final Constraint constraint;
+        final Relation inner = axiom.getRelation();
+        final CAATPredicate innerPred = inner.isSet() ?
             getOrCreateSetFromRelation(inner) :
             getOrCreateGraphFromRelation(inner);
         if (axiom instanceof Acyclicity) {
-            constraint = new AcyclicityConstraint((RelationGraph) innerPred);
+            if (activeAxioms.test(axiom)) {
+                constraint = new AcyclicityConstraint(new IntersectionGraph((RelationGraph) innerPred, new ActiveGraph(axiom)));
+                constraints.add(new EmptinessConstraint(new DifferenceGraph((RelationGraph) innerPred, new MayGraph(inner))));
+            } else {
+                constraint = new AcyclicityConstraint((RelationGraph) innerPred);
+            }
         } else if (axiom instanceof Emptiness) {
-            constraint = new EmptinessConstraint(innerPred);
+            if (innerPred instanceof RelationGraph innerGraph && activeAxioms.test(axiom)) {
+                constraint = new EmptinessConstraint(new IntersectionGraph(innerGraph, new ActiveGraph(axiom)));
+                constraints.add(new EmptinessConstraint(new DifferenceGraph(innerGraph, new MayGraph(inner))));
+            } else {
+                constraint = new EmptinessConstraint(innerPred);
+            }
         } else if (axiom instanceof Irreflexivity) {
-            constraint = new IrreflexivityConstraint((RelationGraph) innerPred);
+            if (activeAxioms.test(axiom)) {
+                constraint = new IrreflexivityConstraint(new IntersectionGraph((RelationGraph) innerPred, new ActiveGraph(axiom)));
+                constraints.add(new EmptinessConstraint(new DifferenceGraph((RelationGraph) innerPred, new MayGraph(inner))));
+            } else {
+                constraint = new IrreflexivityConstraint((RelationGraph) innerPred);
+            }
         } else {
             throw new UnsupportedOperationException("The axiom " + axiom + " is not recognized.");
         }
 
+        constraints.add(constraint);
         constraintMap.put(axiom, constraint);
-        return constraint;
+        return constraints;
     }
 
     private RelationGraph getOrCreateGraphFromRelation(Relation rel) {

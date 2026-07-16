@@ -1,5 +1,6 @@
 package com.dat3m.dartagnan.solver.caat4wmm.coreReasoning;
 
+import com.dat3m.dartagnan.encoding.ActiveSetAnalysis;
 import com.dat3m.dartagnan.program.Thread;
 import com.dat3m.dartagnan.program.analysis.ExecutionAnalysis;
 import com.dat3m.dartagnan.program.analysis.ThreadSymmetry;
@@ -16,6 +17,7 @@ import com.dat3m.dartagnan.utils.logic.DNF;
 import com.dat3m.dartagnan.verification.Context;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
+import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.definition.TagSet;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import com.google.common.collect.BiMap;
@@ -56,6 +58,7 @@ public class CoreReasoner {
     private final ExecutionGraph executionGraph;
     private final ExecutionAnalysis exec;
     private final RelationAnalysis ra;
+    private final ActiveSetAnalysis asa;
     private final List<Function<Event, Event>> symmGenerators;
 
     public CoreReasoner(Context analysisContext, ExecutionGraph executionGraph, Configuration config) throws InvalidConfigurationException {
@@ -63,6 +66,7 @@ public class CoreReasoner {
         this.executionGraph = executionGraph;
         this.exec = analysisContext.requires(ExecutionAnalysis.class);
         this.ra = analysisContext.requires(RelationAnalysis.class);
+        this.asa = analysisContext.requires(ActiveSetAnalysis.class);
         this.symmGenerators = computeSymmetryGenerators(analysisContext.requires(ThreadSymmetry.class));
         logger.info("Symmetric learning {}", symmetricLearning);
     }
@@ -159,6 +163,28 @@ public class CoreReasoner {
             return Collections.emptySet();
         } else if (impliedCoreLit instanceof ExecLiteral impliedExecLiteral
                 && mustSet.contains(impliedExecLiteral.getEvent(), impliedExecLiteral.getEvent())) {
+            return Collections.emptySet();
+        }
+
+        // If the implied literal is not relevant for its axioms, we can skip computing implications for it.
+        boolean irrelevant = true;
+        for (final Axiom axiom : executionGraph.getAxiomConstraintMap().keySet()) {
+            if (axiom.getRelation().equals(impliedRelation)) {
+                final EventGraph relevantSet = asa.getRelevantSet(axiom);
+                if (impliedCoreLit instanceof RelLiteral impliedRelLiteral) {
+                    if (relevantSet.contains(impliedRelLiteral.getSource(), impliedRelLiteral.getTarget())) {
+                        irrelevant = false;
+                    }
+                } else if (impliedCoreLit instanceof ExecLiteral impliedExecLiteral) {
+                    if (relevantSet.contains(impliedExecLiteral.getEvent(), impliedExecLiteral.getEvent())) {
+                        irrelevant = false;
+                    }
+                } else {
+                    irrelevant = false;
+                }
+            }
+        }
+        if (irrelevant) {
             return Collections.emptySet();
         }
 
