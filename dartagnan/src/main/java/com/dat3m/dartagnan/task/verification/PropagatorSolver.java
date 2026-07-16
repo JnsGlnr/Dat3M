@@ -110,7 +110,7 @@ public class PropagatorSolver extends SMTModelChecker<VerificationTask> implemen
             res = FAIL;
         }
 
-        propagator.printStatistic();
+        propagator.printStatistics();
 
         logProverStatistics(logger, prover);
         checkForInterrupts();
