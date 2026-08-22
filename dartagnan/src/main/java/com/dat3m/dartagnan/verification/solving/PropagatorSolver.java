@@ -61,9 +61,10 @@ public class PropagatorSolver extends ModelChecker {
 
         final List<Constraint> constraintsToEncode = new ArrayList<>();
         final List<Acyclicity> axiomsToPropagate = new ArrayList<>();
-        for (Constraint c : task.getMemoryModel().getConstraints()) {
+        for (Constraint c : task.getMemoryModel().getAxioms()) {
             if (c instanceof Acyclicity acyc) {
                 axiomsToPropagate.add(acyc);
+                constraintsToEncode.add(acyc.getRelation().getDefinition());
             } else {
                 constraintsToEncode.add(c);
             }
