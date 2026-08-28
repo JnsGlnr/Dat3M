@@ -16,8 +16,6 @@ public class VarGraph {
     final Map<BooleanFormula, Edge> var2Edge = new HashMap<>();
     final List<Edge>[] inEdges;
     final List<Edge>[] outEdges;
-    final List<Edge> allEdges = new ArrayList<>();
-    final List<Edge> dynamicEdges = new ArrayList<>();
 
     private final List<Edge> trace = new ArrayList<>();
     private final List<Integer> backtrackPoints = new ArrayList<>();
@@ -42,23 +40,24 @@ public class VarGraph {
         return var2Edge.get(edgeVar);
     }
 
-    public void addMustEdge(int source, int target) {
-        addVarEdge(source, target, null);
+    public Edge addMustEdge(int source, int target, BooleanFormula exec) {
+        return addVarEdge(source, target, null, bmgr.not(exec));
     }
 
     public void addVarEdge(int source, int target, BooleanFormula edgeVar) {
+        addVarEdge(source, target, edgeVar, bmgr.not(edgeVar));
+    }
+
+    public Edge addVarEdge(int source, int target, BooleanFormula edgeVar, BooleanFormula negEdgeFormula) {
         final Edge edge = new Edge(source, target, edgeVar);
         inEdges[target].add(edge);
         outEdges[source].add(edge);
-        allEdges.add(edge);
 
         if (!edge.isMust()) {
             var2Edge.put(edgeVar, edge);
-            edge.negEdgeVar = bmgr.not(edgeVar);
-            dynamicEdges.add(edge);
-        } else {
-            edge.value = TRUE;
         }
+        edge.negEdgeFormula = negEdgeFormula;
+        return edge;
     }
 
     public void push() {
@@ -77,7 +76,6 @@ public class VarGraph {
 
     public void assignEdge(Edge e, int value) {
         assert value == TRUE || value == FALSE;
-        assert !e.isMust();
         trace.add(e);
         e.value = value;
     }
@@ -87,7 +85,6 @@ public class VarGraph {
     }
 
     private void unassignEdge(Edge e) {
-        assert !e.isMust();
         e.value = UNASSIGNED;
     }
 
@@ -145,12 +142,12 @@ public class VarGraph {
         private transient int value = UNASSIGNED;
 
         private final transient BooleanFormula edgeVar;
-        private transient BooleanFormula negEdgeVar;
+        private transient BooleanFormula negEdgeFormula;
 
         public int getSource() { return source; }
         public int getTarget() { return target; }
         public BooleanFormula getEdgeVar() { return edgeVar; }
-        public BooleanFormula getNegEdgeVar() { return negEdgeVar; }
+        public BooleanFormula getNegEdgeFormula() { return negEdgeFormula; }
         public int getValue() { return value; }
 
         public Edge(int source, int target, BooleanFormula edgeVar) {

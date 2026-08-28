@@ -3,6 +3,7 @@ package com.dat3m.dartagnan.solver.propagators;
 import com.dat3m.dartagnan.encoding.EncodingContext;
 import com.dat3m.dartagnan.encoding.WmmEncoder;
 import com.dat3m.dartagnan.program.analysis.EventDomainRepository;
+import com.dat3m.dartagnan.program.analysis.ExecutionAnalysis;
 import com.dat3m.dartagnan.program.event.Event;
 import com.dat3m.dartagnan.utils.collections.IndexedDomain;
 import com.dat3m.dartagnan.wmm.Relation;
@@ -26,11 +27,15 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
     private static final boolean allowDuplicatePropagation = false;
 
     private final RelationAnalysis relationAnalysis;
+    private final ExecutionAnalysis executionAnalysis;
     private final EncodingContext context;
     private final WmmEncoder wmmEncoder;
     private final List<Case> cases = new ArrayList<>();
     private final Map<BooleanFormula, Case> lit2Case = new HashMap<>();
     private final IndexedDomain<Event> domain;
+    private final ExecGraph exec;
+    private final Map<BooleanFormula, List<PartiallyResolvedMustEdge>> execToMustEdges;
+    private final Map<VarGraph.Edge, EdgeExecFormula> mustEdgeToExec;
 
     // -------- Dynamic search data --------
     private int curLevel = 0;
@@ -57,12 +62,16 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
     public AcyclicityPropagatorNew(WmmEncoder wmmEncoder, EncodingContext ctx) {
         this.context = ctx;
         this.relationAnalysis = ctx.getAnalysisContext().requires(RelationAnalysis.class);
+        this.executionAnalysis = ctx.getAnalysisContext().requires(ExecutionAnalysis.class);
         this.wmmEncoder = wmmEncoder;
 
         this.domain = ctx.getAnalysisContext().requires(EventDomainRepository.class)
                 .getDomain(EventDomainRepository.DomainBound.VISIBLE);
+        this.exec = new ExecGraph(domain.size());
         ingoingMap = new VarGraph.Edge[domain.size()];
         outgoingMap = new VarGraph.Edge[domain.size()];
+        execToMustEdges = new HashMap<>(domain.size() * 4 / 3);
+        mustEdgeToExec = new HashMap<>();
     }
 
     public void registerAxiom(Acyclicity axiom) {
@@ -80,6 +89,7 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
         backend.notifyOnKnownValue();
 
         AtomicInteger numDynamicEdges = new AtomicInteger();
+        final Map<BooleanFormula, FormulaData> mustFormulas = new HashMap<>();
         for (Case c : cases) {
             final Acyclicity axiom = c.axiom();
             final Relation rel = axiom.getRelation();
@@ -90,22 +100,40 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
             relevantSet.apply((x, y) -> {
                 final int idx = domain.indexOf(x);
                 final int idy = domain.indexOf(y);
+                final BooleanFormula edgeLit = context.edgeVariable(rel.getNameOrTerm(), x, y);
                 if (must.contains(x, y)) {
-                    // TODO: This is unsound unless the must-edges satisfy
-                    //  (x,y) in must(r) /\ (y, z) in must(r) => (x, z) in must(r^+)
-                    //  which is the case for SC
-                    graph.addMustEdge(idx, idy);
+                    final EdgeExecFormula edgeExec;
+                    if (executionAnalysis.isImplied(x, y)) {
+                        edgeExec = registerSingleExecEdge(x, idx, edgeLit, backend);
+                    } else if (executionAnalysis.isImplied(y, x)) {
+                        edgeExec = registerSingleExecEdge(y, idy, edgeLit, backend);
+                    } else {
+                        final BooleanFormula execLitX = context.execution(x);
+                        final BooleanFormula execLitY = context.execution(y);
+                        final ExecGraph.ExecLiteral execX = exec.addVar(idx, execLitX);
+                        final ExecGraph.ExecLiteral execY = exec.addVar(idy, execLitY);
+                        final PartiallyResolvedMustEdge remainingX = new PartiallyResolvedMustEdge(edgeLit, execY);
+                        final PartiallyResolvedMustEdge remainingY = new PartiallyResolvedMustEdge(edgeLit, execX);
+                        execToMustEdges.computeIfAbsent(execLitX, k -> new ArrayList<>()).add(remainingX);
+                        execToMustEdges.computeIfAbsent(execLitY, k -> new ArrayList<>()).add(remainingY);
+                        backend.registerExpression(execLitX);
+                        backend.registerExpression(execLitY);
+                        edgeExec = new EdgeExecFormula(execLitX, execLitY);
+                    }
+                    final BooleanFormula exec = context.execution(x, y);
+                    VarGraph.Edge edge = graph.addMustEdge(idx, idy, exec);
+                    mustEdgeToExec.put(edge, edgeExec);
+                    mustFormulas.put(edgeLit, new FormulaData(graph, edge));
                 } else {
-                    final BooleanFormula edgeLit = context.edge(rel, x, y);
                     lit2Case.put(edgeLit, c);
                     graph.addVarEdge(idx, idy, edgeLit);
                     backend.registerExpression(edgeLit);
-                    numDynamicEdges.getAndIncrement();
                 }
+                numDynamicEdges.getAndIncrement();
             });
         }
 
-        formulaLookup = new CachingFormulaMap<>(numDynamicEdges.get() * 2, key-> {
+        formulaLookup = new CachingFormulaMap<>(numDynamicEdges.get() * 2, mustFormulas, key -> {
             final VarGraph graph = lit2Case.get(key).graph();
             final VarGraph.Edge edge = graph.getEdge(key);
             return new FormulaData(graph, edge);
@@ -113,9 +141,19 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
         alreadyPropagatedEdges = Collections.newSetFromMap(new IdentityHashMap<>(numDynamicEdges.get()));
     }
 
+    private EdgeExecFormula registerSingleExecEdge(Event event, int id, BooleanFormula edgeLit, PropagatorBackend backend) {
+        final BooleanFormula execLit = context.execution(event);
+        exec.addVar(id, execLit);
+        final PartiallyResolvedMustEdge remaining = new PartiallyResolvedMustEdge(edgeLit, null);
+        execToMustEdges.computeIfAbsent(execLit, k -> new ArrayList<>()).add(remaining);
+        backend.registerExpression(execLit);
+        return new EdgeExecFormula(execLit, null);
+    }
+
     @Override
     public void onPush() {
         curLevel++;
+        exec.push();
         cases.forEach(c -> c.graph.push());
         // System.out.println("------- Push: " + curLevel + " -------");
     }
@@ -124,11 +162,11 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
     public void onPop(int numPoppedLevels) {
         raisedConflict = false;
         curLevel -= numPoppedLevels;
+        exec.pop(numPoppedLevels);
         cases.forEach(c -> c.graph.pop(numPoppedLevels));
         alreadyPropagatedEdges.clear();
         // System.out.println("------- Pop to: " + curLevel + " -------");
     }
-
 
     @Override
     public void onKnownValue(BooleanFormula expr, boolean value) {
@@ -138,23 +176,43 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
             return;
         }
 
+        final List<PartiallyResolvedMustEdge> mustEdges = execToMustEdges.get(expr);
+        if (mustEdges == null) {
+            onKnownEdgeValue(expr, value);
+        } else {
+            exec.assignLiteral(exec.getEdge(expr), value);
+            for (final PartiallyResolvedMustEdge mustData : mustEdges) {
+                final BooleanFormula mustExpr = mustData.mustEdge();
+                final ExecGraph.ExecLiteral otherExec = mustData.remainingExec();
+                if (otherExec == null) {
+                    onKnownEdgeValue(mustExpr, value);
+                } else if (!otherExec.isUnassigned()) {
+                    onKnownEdgeValue(mustExpr, value && otherExec.isTrue());
+                }
+            }
+        }
+    }
+
+    public void onKnownEdgeValue(BooleanFormula expr, boolean value) {
         final FormulaData data = formulaLookup.get(expr);
         final VarGraph graph = data.graph();
         final VarGraph.Edge edge = data.edge();
-        graph.assignEdge(edge, value);
+        if (edge.isUnassigned() || value != edge.isTrue()) {
+            graph.assignEdge(edge, value);
 
-        if (value) {
-            if (alreadyPropagatedEdges.contains(edge)) {
-                raisedConflict = true;
-                // System.out.println("Propagation conflict");
-                return;
-            }
-            processEdgeAddition(graph, edge);
+            if (value) {
+                if (alreadyPropagatedEdges.contains(edge)) {
+                    raisedConflict = true;
+                    // System.out.println("Propagation conflict");
+                    return;
+                }
+                processEdgeAddition(graph, edge);
 
-            numChecks++;
-            if (numChecks % 1000000 == 0) {
-                System.out.println("numChecks: " + numChecks);
-                printStatistics();
+                numChecks++;
+                if (numChecks % 1000000 == 0) {
+                    System.out.println("numChecks: " + numChecks);
+                    printStatistics();
+                }
             }
         }
     }
@@ -181,9 +239,7 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
         VarGraph.Edge curEdge;
         do {
             curEdge = ingoingMap[cur];
-            if (!curEdge.isMust()) {
-                conflict.add(curEdge.getEdgeVar());
-            }
+            addToReason(conflict, curEdge);
             cur = curEdge.getSource();
         } while (curEdge != edge);
 
@@ -263,9 +319,7 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
             int cur = edge.getSource();
             VarGraph.Edge curEdge;
             while ((curEdge = ingoingMap[cur]) != null) {
-                if (!curEdge.isMust()) {
-                    reason.add(curEdge.getEdgeVar());
-                }
+                addToReason(reason, curEdge);
                 cur = curEdge.getSource();
             }
 
@@ -275,19 +329,29 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
             cur = edge.getTarget();
             while (cur != target) {
                 curEdge = outgoingMap[cur];
-                if (!curEdge.isMust()) {
-                    reason.add(curEdge.getEdgeVar());
-                }
+                addToReason(reason, curEdge);
                 cur = curEdge.getTarget();
             }
 
             // Propagate
             assert !reason.isEmpty();
             final BooleanFormula[] propReason = reason.toArray(new BooleanFormula[0]);
-            getBackend().propagateConsequence(propReason, edge.getNegEdgeVar());
+            getBackend().propagateConsequence(propReason, edge.getNegEdgeFormula());
             numPropagations++;
             alreadyPropagatedEdges.add(edge);
+        }
+    }
 
+    private void addToReason(List<BooleanFormula> reason, VarGraph.Edge edge) {
+        if (edge.isMust()) {
+            final EdgeExecFormula edgeExec = mustEdgeToExec.get(edge);
+            reason.add(edgeExec.exec1());
+            final BooleanFormula exec2 = edgeExec.exec2();
+            if (exec2 != null) {
+                reason.add(exec2);
+            }
+        } else {
+            reason.add(edge.getEdgeVar());
         }
     }
 
@@ -313,6 +377,9 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
 
     private record FormulaData(VarGraph graph, VarGraph.Edge edge) { }
 
+    private record PartiallyResolvedMustEdge(BooleanFormula mustEdge, ExecGraph.ExecLiteral remainingExec) { }
+
+    private record EdgeExecFormula(BooleanFormula exec1, BooleanFormula exec2) { }
 
     // TODO: Test code to minimize hashtable lookup times with BooleanFormula
     //  The IdentityHashMap is used to avoid expensive .equals calls on BooleanFormula
@@ -322,8 +389,10 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
         private final IdentityHashMap<BooleanFormula, TData> formulaLookup;
         private final Function<BooleanFormula, TData> dataConstructor;
 
-        public CachingFormulaMap(int expectedMaxSize, Function<BooleanFormula, TData> dataConstructor) {
+        public CachingFormulaMap(int expectedMaxSize, Map<BooleanFormula, TData> initialData,
+                                 Function<BooleanFormula, TData> dataConstructor) {
             this.formulaLookup = new IdentityHashMap<>(expectedMaxSize);
+            this.formulaLookup.putAll(initialData);
             this.dataConstructor = dataConstructor;
         }
 
@@ -331,5 +400,4 @@ public class AcyclicityPropagatorNew extends AbstractUserPropagator {
             return formulaLookup.computeIfAbsent(formula, dataConstructor);
         }
     }
-
 }
