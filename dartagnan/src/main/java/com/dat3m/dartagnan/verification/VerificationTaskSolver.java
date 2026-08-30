@@ -1,11 +1,7 @@
 package com.dat3m.dartagnan.verification;
 
 import com.dat3m.dartagnan.configuration.Method;
-import com.dat3m.dartagnan.verification.solving.AssumeSolver;
-import com.dat3m.dartagnan.verification.solving.AxiomRefinementSolver;
-import com.dat3m.dartagnan.verification.solving.ModelChecker;
-import com.dat3m.dartagnan.verification.solving.PropagatorSolver;
-import com.dat3m.dartagnan.verification.solving.RefinementSolver;
+import com.dat3m.dartagnan.verification.solving.*;
 import com.google.common.base.Preconditions;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
 import org.sosy_lab.common.configuration.Option;
@@ -54,6 +50,7 @@ public final class VerificationTaskSolver extends TaskSolverBase<VerificationTas
         modelChecker = switch (method) {
             case EAGER -> AssumeSolver.create(task);
             case PROPAGATOR -> PropagatorSolver.create(task);
+            case EAZY_PROPAGATOR -> AxiomRefinementPropagatorSolver.create(task);
             case EAZY -> AxiomRefinementSolver.create(task);
             case LAZY -> RefinementSolver.create(task);
         };
