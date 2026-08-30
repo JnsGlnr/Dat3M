@@ -50,6 +50,7 @@ public final class VerificationTaskSolver extends TaskSolverBase<VerificationTas
         verifier = switch (method) {
             case EAGER -> AssumeSolver.create(task);
             case PROPAGATOR -> PropagatorSolver.create(task);
+            case EAZY_PROPAGATOR -> AxiomRefinementPropagatorSolver.create(task);
             case EAZY -> AxiomRefinementSolver.create(task);
             case LAZY -> RefinementSolver.create(task);
         };
