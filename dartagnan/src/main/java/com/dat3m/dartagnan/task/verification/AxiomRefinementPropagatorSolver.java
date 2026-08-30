@@ -1,0 +1,600 @@
+package com.dat3m.dartagnan.task.verification;
+
+import com.dat3m.dartagnan.configuration.Method;
+import com.dat3m.dartagnan.configuration.Property;
+import com.dat3m.dartagnan.encoding.*;
+import com.dat3m.dartagnan.program.event.Event;
+import com.dat3m.dartagnan.smt.ProverWithTracker;
+import com.dat3m.dartagnan.solver.caat.CAATSolver;
+import com.dat3m.dartagnan.solver.caat4wmm.EazyRefiner;
+import com.dat3m.dartagnan.solver.caat4wmm.EazyWMMSolver;
+import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreImplication;
+import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreLiteral;
+import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.RelLiteral;
+import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.TrivialImplications;
+import com.dat3m.dartagnan.solver.propagators.AcyclicityPropagatorNew;
+import com.dat3m.dartagnan.utils.logic.Conjunction;
+import com.dat3m.dartagnan.utils.logic.DNF;
+import com.dat3m.dartagnan.task.*;
+import com.dat3m.dartagnan.task.Context;
+import com.dat3m.dartagnan.model.EventData;
+import com.dat3m.dartagnan.wmm.Constraint;
+import com.dat3m.dartagnan.wmm.Definition;
+import com.dat3m.dartagnan.wmm.Relation;
+import com.dat3m.dartagnan.wmm.Wmm;
+import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
+import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
+import com.dat3m.dartagnan.wmm.axiom.Axiom;
+import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
+import com.dat3m.dartagnan.wmm.definition.*;
+import com.dat3m.dartagnan.wmm.processing.EmptinessToIrreflexivity;
+import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.sosy_lab.common.configuration.Configuration;
+import org.sosy_lab.common.configuration.InvalidConfigurationException;
+import org.sosy_lab.common.configuration.Option;
+import org.sosy_lab.common.configuration.Options;
+import org.sosy_lab.java_smt.api.BooleanFormula;
+import org.sosy_lab.java_smt.api.BooleanFormulaManager;
+import org.sosy_lab.java_smt.api.SolverContext;
+import org.sosy_lab.java_smt.api.SolverException;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static com.dat3m.dartagnan.configuration.OptionNames.BASE_METHOD;
+import static com.dat3m.dartagnan.configuration.OptionNames.TRIVIAL_IMPLICATIONS;
+import static com.dat3m.dartagnan.solver.caat.CAATSolver.Status.*;
+import static com.dat3m.dartagnan.task.verification.VerificationStatus.*;
+import static com.dat3m.dartagnan.utils.Utils.toTimeString;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singleton;
+import static java.util.function.Predicate.not;
+
+/*
+    Axiom refinement is a custom solving procedure that starts with free memory model axioms and iteratively refines
+    their derivations from base relations to perform a verification task.
+    It can be understood as a hybrid eager-lazy offline-SMT solver.
+    More concretely, it iteratively
+        - finds some assertion-violating execution w.r.t. (possibly free) memory model axioms
+        - checks the consistency of this execution using a custom theory solver (CAAT-Solver)
+        - refines the derivation of axioms from base relations if the found execution was inconsistent, using the
+          explanations provided by the theory solver.
+ */
+@Options
+public class AxiomRefinementPropagatorSolver extends RefinementSolver {
+
+    private static final Logger logger = LoggerFactory.getLogger(AxiomRefinementPropagatorSolver.class);
+
+    // ================================================================================================================
+    // Configuration
+
+    @Option(name=BASE_METHOD,
+            description="Used method to solve all non-eazy constraints.",
+            secure=true,
+            toUppercase=true)
+    private Method baseMethod = Method.getDefault();
+
+    @Option(name=TRIVIAL_IMPLICATIONS,
+            description="Use trivial implications.",
+            secure=true,
+            toUppercase=true)
+    private boolean useTrivialImplications = true;
+
+    // ================================================================================================================
+    // Data classes
+
+    private record RefinementIteration(
+            SMTStatus smtStatus,
+            long nativeSmtTime,
+            long caatTime,
+            long refineTime,
+            // The following are only meaningful if <smtStatus>==SAT
+            CAATSolver.Status caatStatus,
+            BooleanFormula refinementFormula,
+            // The following are only for statistics keeping
+            EazyWMMSolver.Statistics caatStats,
+            DNF<CoreLiteral> inconsistencyReasons,
+            Conjunction<CoreImplication> inconsistencyImplications,
+            List<Event> observedEvents
+    ) {
+        public boolean isInconclusive() { return smtStatus == SMTStatus.SAT && caatStatus == INCONSISTENT; }
+        public boolean isConclusive() { return !isInconclusive(); }
+    }
+
+    private record RefinementTrace(List<RefinementIteration> iterations) {
+        public RefinementIteration getFinalIteration() { return iterations.getLast(); }
+
+        public SMTStatus getFinalResult() {
+            final RefinementIteration finalIteration = getFinalIteration();
+            if (finalIteration.smtStatus != SMTStatus.SAT) {
+                return finalIteration.smtStatus;
+            } else if (finalIteration.caatStatus == CONSISTENT) {
+                return SMTStatus.SAT;
+            } else {
+                return SMTStatus.UNKNOWN;
+            }
+        }
+
+        public long getNativeSmtTime() { return iterations.stream().mapToLong(RefinementIteration::nativeSmtTime).sum(); }
+        public long getCaatTime() { return iterations.stream().mapToLong(RefinementIteration::caatTime).sum(); }
+        public long getRefiningTime() { return iterations.stream().mapToLong(RefinementIteration::refineTime).sum(); }
+
+        public Set<Event> getObservedEvents() {
+            return iterations.stream().filter(iter -> iter.observedEvents != null)
+                    .flatMap(iter -> iter.observedEvents.stream()).collect(Collectors.toSet());
+        }
+
+        public List<BooleanFormula> getRefinementFormulas() {
+            return iterations.stream().filter(iter -> iter.refinementFormula != null)
+                    .map(RefinementIteration::refinementFormula).toList();
+        }
+
+        public RefinementTrace concat(RefinementTrace other) {
+            return new RefinementTrace(Lists.newArrayList(Iterables.concat(this.iterations, other.iterations)));
+        }
+    }
+
+    // ================================================================================================================
+    // Axiom refinement solver
+
+    private EncodingContext context;
+
+    private AxiomRefinementPropagatorSolver(VerificationTask task) throws InvalidConfigurationException {
+        super(task);
+        task.getConfig().inject(this);
+        if (baseMethod == Method.EAZY) {
+            throw new UnsupportedOperationException(BASE_METHOD + " \"" + Method.EAZY.name() + "\" is not supported");
+        }
+    }
+
+    public static AxiomRefinementPropagatorSolver create(VerificationTask task) throws InvalidConfigurationException  {
+        return new AxiomRefinementPropagatorSolver(task);
+    }
+
+    protected Context preprocessAndAnalyze(Task task) throws InvalidConfigurationException {
+        final Configuration config = task.getConfig();
+
+        preprocessProgram(task, config);
+        preprocessMemoryModel(task);
+        instrumentPolaritySeparation(task.getMemoryModel());
+
+        EmptinessToIrreflexivity.newInstance().run(task.getMemoryModel());
+
+        final Context analysisContext = Context.create();
+        performStaticProgramAnalyses(task, analysisContext, config);
+        performStaticWmmAnalyses(task, analysisContext, config);
+        performIntervalAnalysis(task, analysisContext, config);
+        return analysisContext;
+    }
+
+    @Override
+    public VerificationResult verify() throws InterruptedException, SolverException, InvalidConfigurationException {
+        // ------------------------ Preprocessing / Analysis ------------------------
+        final Context analysisContext = preprocessAndAnalyze(task);
+
+        //  ------- Generate refinement model -------
+        final Wmm memoryModel = task.getMemoryModel();
+        final Collection<Constraint> wmmConstraintsToEncode = new LinkedHashSet<>(generateCut(memoryModel));
+        // We want to encode all acyclicity axioms but without dependencies
+        final Map<Constraint, Constraint> constraintsToEazyConstraints = getConstraintsToEazyConstraints(memoryModel.getAxioms(), wmmConstraintsToEncode);
+        final Collection<Constraint> eazyConstraints = constraintsToEazyConstraints.values();
+        wmmConstraintsToEncode.addAll(eazyConstraints);
+        wmmConstraintsToEncode.addAll(getNonStaticBaseConstraints(constraintsToEazyConstraints.keySet(), analysisContext));
+        if (baseMethod == Method.EAGER) {
+            wmmConstraintsToEncode.addAll(memoryModel.getAxioms().stream()
+                    .filter(not(eazyConstraints::contains))
+                    .toList());
+        }
+        final List<Acyclicity> axiomsToPropagate = eazyConstraints.stream()
+                .filter(Acyclicity.class::isInstance)
+                .map(Acyclicity.class::cast)
+                .toList();
+        wmmConstraintsToEncode.removeAll(axiomsToPropagate);
+
+        // ------------------------ Encoding ------------------------
+        initSMTSolver(task.getConfig());
+        final SolverContext ctx = this.solverContext;
+        final ProverWithTracker prover = this.prover;
+
+        context = EncodingContext.of(task, analysisContext, ctx.getFormulaManager(), wmmConstraintsToEncode);
+        final ProgramEncoder programEncoder = ProgramEncoder.withContext(context);
+        final WmmEncoder baselineEncoder = WmmEncoder.withContext(context);
+        final PropertyEncoder propertyEncoder = PropertyEncoder.withContext(context, baselineEncoder);
+        final SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
+
+        final BooleanFormulaManager bmgr = ctx.getFormulaManager().getBooleanFormulaManager();
+        final TrivialImplications trivialImplications = getTrivialImplications(eazyConstraints, useTrivialImplications);
+        final boolean computeCoreReasons = baseMethod == Method.LAZY;
+        final EazyWMMSolver solver = EazyWMMSolver.withContext(context, eazyConstraints, trivialImplications, computeCoreReasons);
+        final EazyRefiner refiner = EazyRefiner.newInstance();
+        final Property.Type propertyType = Property.getCombinedType(task.getProperties(), task);
+
+        System.out.println("Propagating axioms: " + axiomsToPropagate);
+        //AcyclicityPropagator propagator = new AcyclicityPropagator(baselineEncoder, context);
+        AcyclicityPropagatorNew propagator = new AcyclicityPropagatorNew(baselineEncoder, context);
+        axiomsToPropagate.forEach(propagator::registerAxiom);
+        prover.registerUserPropagator(propagator);
+
+        logger.info("Starting encoding using {}", ctx.getVersion());
+        prover.writeComment("Program encoding");
+        prover.addConstraint(programEncoder.encodeFullProgram());
+        prover.writeComment("Memory model (baseline) encoding");
+        prover.addConstraint(baselineEncoder.encodeFullMemoryModel());
+        prover.writeComment("Trivial implications from base relations to axioms");
+        prover.addConstraint(trivialImplications.encode(context));
+        prover.writeComment("Symmetry breaking encoding");
+        prover.addConstraint(symmetryEncoder.encodeFullSymmetryBreaking());
+        // Bounds
+        prover.writeComment("Bounds over variables");
+        prover.addConstraint(programEncoder.encodeBounds());
+
+        // ------------------------ Solving ------------------------
+        logger.info("Axiom refinement procedure started.");
+
+        logger.info("Checking target property.");
+        prover.push();
+        prover.writeComment("Property encoding");
+        prover.addConstraint(propertyEncoder.encodeProperties(task.getProperties()));
+
+        final RefinementTrace propertyTrace = runRefinement(prover, solver, refiner);
+        SMTStatus smtStatus = propertyTrace.getFinalResult();
+
+        if (smtStatus == SMTStatus.UNKNOWN) {
+            // Refinement got no result (should not be able to happen), so we cannot proceed further.
+            logger.warn("Axiom refinement procedure was inconclusive. Trying to find reason of inconclusiveness.");
+            analyzeInconclusiveness(task, analysisContext, solver.getExecution());
+            throw new RuntimeException("Terminated verification due to inconclusiveness (bug?).");
+        }
+
+        if (logger.isInfoEnabled()) {
+            final String message = switch (smtStatus) {
+                case SAT -> propertyType == Property.Type.SAFETY ? "Specification violation found."
+                        : "Specification witness found.";
+                case UNSAT -> propertyType == Property.Type.SAFETY ? "Bounded specification proven."
+                        : "Bounded specification falsified.";
+                // Cannot be reached due to the above checks.
+                default -> throw new RuntimeException("unreachable");
+            };
+            logger.info(message);
+        }
+
+        RefinementTrace combinedTrace = propertyTrace;
+
+        VerificationStatus res;
+        long boundCheckTime = 0;
+        if (smtStatus == SMTStatus.UNSAT) {
+            // Do bound check
+            logger.info("Checking unrolling bounds.");
+            final long lastTime = System.currentTimeMillis();
+            prover.pop();
+            prover.writeComment("Bound encoding");
+            prover.addConstraint(propertyEncoder.encodeBoundEventExec());
+            // Add back the refinement clauses we already found, hoping that this improves the performance.
+            prover.writeComment("Refinement encoding");
+            prover.addConstraint(bmgr.and(propertyTrace.getRefinementFormulas()));
+            final RefinementTrace boundTrace = runRefinement(prover, solver, refiner);
+            boundCheckTime = System.currentTimeMillis() - lastTime;
+
+            smtStatus = boundTrace.getFinalResult();
+            combinedTrace = combinedTrace.concat(boundTrace);
+            res = smtStatus == SMTStatus.UNSAT ? PASS : UNKNOWN;
+
+            if (logger.isInfoEnabled()) {
+                final String message = switch (smtStatus) {
+                    case UNKNOWN -> "Bound check was inconclusive (bug?)";
+                    case SAT -> "Bounds are reachable: Unbounded specification unknown.";
+                    case UNSAT -> "Bounds are unreachable: Unbounded specification proven.";
+                };
+                logger.info(message);
+            }
+        } else {
+            res = FAIL;
+        }
+
+        // -------------------------- Report statistics summary --------------------------
+
+        if (logger.isInfoEnabled()) {
+            logger.info(generateSummary(combinedTrace, boundCheckTime, computeCoreReasons));
+        }
+
+        propagator.printStatistics();
+
+        logProverStatistics(logger, prover);
+
+        printCovReport(combinedTrace.getObservedEvents(), task.getProgram(), analysisContext);
+
+        final IREvaluator model = smtStatus == SMTStatus.SAT ? context.newEvaluator(prover) : null;
+        if (model != null) {
+            validateModel(solver.getExecution());
+        }
+        // For Safety specs, we have SAT=FAIL, but for reachability specs, we have
+        // SAT=PASS
+        res = propertyType == Property.Type.SAFETY ? res : res.invert();
+
+        logger.info("Verification finished with result {}", res);
+        return new VerificationResult(this.task, res, model);
+    }
+
+    // ================================================================================================================
+    // Axiom refinement core algorithm
+
+    // TODO: We could expose the following method(s) to allow for more general application of refinement.
+    private RefinementTrace runRefinement(ProverWithTracker prover, EazyWMMSolver solver, EazyRefiner refiner)
+            throws SolverException, InterruptedException {
+
+        final List<RefinementIteration> trace = new ArrayList<>();
+        boolean isFinalIteration = false;
+        while (!isFinalIteration) {
+            checkForInterrupts();
+            final RefinementIteration iteration = doRefinementIteration(prover, solver, refiner);
+            trace.add(iteration);
+            isFinalIteration = !checkProgress(trace) || iteration.isConclusive();
+
+            // ------------------------- Debugging/Logging -------------------------
+            if (logger.isDebugEnabled()) {
+                // ---- Internal SMT stats after the first iteration ----
+                if (trace.size() == 1) {
+                    StringBuilder smtStatistics = new StringBuilder(
+                            "\n ===== SMT Statistics (after first iteration) ===== \n");
+                    for (String key : prover.getStatistics().keySet()) {
+                        smtStatistics.append(String.format("\t%s -> %s\n", key, prover.getStatistics().get(key)));
+                    }
+                    logger.debug(smtStatistics.toString());
+                }
+
+                // ---- Debug iteration stats ----
+                final StringBuilder debugMessage = new StringBuilder();
+                debugMessage.append("\n").append(String.format("""
+                        ===== Solver iteration: %d =====
+                        Native solving time(ms): %s
+                        """, trace.size(), iteration.nativeSmtTime));
+                if (!isFinalIteration) {
+                    debugMessage.append(iteration.caatStats);
+                }
+                logger.debug(debugMessage.toString());
+
+                // ---- Trace iteration stats ----
+                if (logger.isTraceEnabled() && !isFinalIteration) {
+                    final StringBuilder traceMessage = new StringBuilder().append("Found inconsistency reasons:\n");
+                    for (Conjunction<CoreLiteral> cube : iteration.inconsistencyReasons.getCubes()) {
+                        traceMessage.append(cube).append("\n");
+                    }
+
+                    traceMessage.append("Found inconsistency implications:\n");
+                    for (CoreImplication implication : iteration.inconsistencyImplications.getLiterals()) {
+                        traceMessage.append(implication).append("\n");
+                    }
+                    logger.trace(traceMessage.toString());
+                }
+            }
+        }
+
+        return new RefinementTrace(trace);
+    }
+
+    private boolean checkProgress(List<RefinementIteration> trace) {
+        if (trace.size() < 2 || trace.getLast().isConclusive()) {
+            return true;
+        }
+        final RefinementIteration last = trace.getLast();
+        final RefinementIteration prev = trace.get(trace.size() - 2);
+        return !(last.inconsistencyReasons.equals(prev.inconsistencyReasons) && last.inconsistencyImplications.equals(prev.inconsistencyImplications));
+    }
+
+    // ================================================================================================================
+    // Special memory model processing
+
+    private RefinementIteration doRefinementIteration(ProverWithTracker prover, EazyWMMSolver solver, EazyRefiner refiner)
+            throws SolverException, InterruptedException {
+
+        long nativeTime;
+        long caatTime = 0;
+        long refineTime = 0;
+        CAATSolver.Status caatStatus = INCONCLUSIVE;
+        BooleanFormula refinementFormula = null;
+        EazyWMMSolver.Statistics caatStats = null;
+        DNF<CoreLiteral> inconsistencyReasons = null;
+        Conjunction<CoreImplication> inconsistencyImplications = null;
+        List<Event> observedEvents = null;
+
+        // ------------ Native SMT solving ------------
+        long lastTime = System.currentTimeMillis();
+        final SMTStatus smtStatus = prover.isUnsat() ? SMTStatus.UNSAT : SMTStatus.SAT;
+        nativeTime = (System.currentTimeMillis() - lastTime);
+
+        if (smtStatus == SMTStatus.SAT) {
+            // ------------ CAAT solving ------------
+            lastTime = System.currentTimeMillis();
+            final EazyWMMSolver.Result solverResult;
+            try (IREvaluator model = context.newEvaluator(prover)) {
+                solverResult = solver.check(model);
+            } catch (SolverException e) {
+                logger.error(e.getMessage());
+                throw e;
+            }
+            caatTime = (System.currentTimeMillis() - lastTime);
+
+            observedEvents = new ArrayList<>(Lists.transform(solver.getExecution().getEventList(), EventData::getEvent));
+            caatStatus = solverResult.getStatus();
+            caatStats = solverResult.getStatistics();
+            if (caatStatus == INCONSISTENT) {
+                // ------------ Refining ------------
+                inconsistencyReasons = solverResult.getCoreReasons();
+                inconsistencyImplications = solverResult.getCoreImplications();
+                lastTime = System.currentTimeMillis();
+                refinementFormula = refiner.refine(inconsistencyReasons, inconsistencyImplications, context);
+                prover.writeComment("Refinement encoding");
+                prover.addConstraint(refinementFormula);
+                refineTime = (System.currentTimeMillis() - lastTime);
+            }
+        }
+
+        return new RefinementIteration(
+                smtStatus, nativeTime, caatTime, refineTime, caatStatus,
+                refinementFormula, caatStats, inconsistencyReasons, inconsistencyImplications, observedEvents
+        );
+    }
+
+    private Map<Constraint, Constraint> getConstraintsToEazyConstraints(Collection<Axiom> axioms, Collection<Constraint> wmmConstraintsToEncode) {
+        final Map<Constraint, Constraint> constraintsToEazyConstraints = new LinkedHashMap<>();
+        axioms.stream()
+                .filter(Acyclicity.class::isInstance)
+                .filter(not(wmmConstraintsToEncode::contains))
+                .forEach(a -> constraintsToEazyConstraints.put(a, new Acyclicity(a.getRelation(), a.isNegated(), a.isFlagged()) {
+                    @Override
+                    public List<? extends Relation> getConstrainedRelations() {
+                        return Collections.emptyList();
+                    }
+                }));
+        return constraintsToEazyConstraints;
+    }
+
+    private Collection<Constraint> getNonStaticBaseConstraints(Collection<Constraint> origEazyConstraints, Context analysisContext) {
+        final RelationAnalysis ra = analysisContext.requires(RelationAnalysis.class);
+        final Collection<Constraint> nonStaticBaseConstraints = new ArrayList<>();
+        final Set<Constraint> visited = new HashSet<>();
+        for (Constraint eazyConstraint : origEazyConstraints) {
+            final Deque<Constraint> visitingStack = new ArrayDeque<>();
+            visitingStack.push(eazyConstraint);
+            while (!visitingStack.isEmpty()) {
+                final Constraint constraint = visitingStack.pop();
+                if (visited.add(constraint)) {
+                    final Collection<? extends Constraint> deps = Wmm.computeConstraintDependencies(constraint);
+                    if (deps.isEmpty()) {
+                        if (!nonStaticBaseConstraints.contains(constraint)) {
+                            final Relation baseRel = constraint.getConstrainedRelations().get(0);
+                            final RelationAnalysis.Knowledge k = ra.getKnowledge(baseRel);
+                            if (k.getMaySet().size() != k.getMustSet().size()) {
+                                nonStaticBaseConstraints.add(constraint);
+                            }
+                        }
+                    } else {
+                        for (Constraint dep : deps) {
+                            visitingStack.push(dep);
+                        }
+                    }
+                }
+            }
+        }
+        return nonStaticBaseConstraints;
+    }
+
+    private TrivialImplications getTrivialImplications(Collection<? extends Constraint> eazyConstraints, boolean enabled) {
+        final ActiveSetAnalysis asa = context.getAnalysisContext().requires(ActiveSetAnalysis.class);
+        final Map<Relation, Map<Relation, Map<RelLiteral, Set<TrivialImplications.Implied>>>> result = new LinkedHashMap<>();
+        for (Constraint eazyConstraint : eazyConstraints) {
+            for (final Definition eazyDef : getEazyDefinitions(eazyConstraint)) {
+                final Relation eazyRel = eazyDef.getDefinedRelation();
+                if (!result.containsKey(eazyRel)) {
+                    final EventGraph encodeSet;
+                    if (eazyConstraint instanceof final Axiom axiom && eazyRel == axiom.getRelation()) {
+                        encodeSet = asa.getRelevantSet(axiom);
+                    } else {
+                        encodeSet = asa.getActiveSet(eazyDef);
+                    }
+                    result.put(eazyRel, enabled ? TrivialImplications.getTrivialImplications(context, eazyRel, encodeSet) : emptyMap());
+                }
+            }
+        }
+        return new TrivialImplications(result);
+    }
+
+    private static Collection<Definition> getEazyDefinitions(final Constraint eazyConstraint) {
+        if (eazyConstraint instanceof Definition) {
+            return singleton((Definition) eazyConstraint);
+        } else if (eazyConstraint instanceof final Axiom eazyAxiom) {
+            if (eazyAxiom instanceof final EazyIrreflexivity irreflexivity) {
+                return irreflexivity.getComponents();
+            } else {
+                return singleton(eazyAxiom.getRelation().getDefinition());
+            }
+        } else {
+            throw new IllegalStateException("Unsupported eazy constraint type: " + eazyConstraint.getClass().getSimpleName());
+        }
+    }
+
+    // ================================================================================================================
+    // Statistics & Debugging
+
+    private static String generateSummary(RefinementTrace trace, long boundCheckTime, boolean hasReasons) {
+        final List<EazyWMMSolver.Statistics> statList = trace.iterations.stream()
+                .filter(iter -> iter.caatStats != null).map(RefinementIteration::caatStats).toList();
+        final long totalNativeSolvingTime = trace.getNativeSmtTime();
+        final long totalCaatTime = trace.getCaatTime();
+        final long totalRefiningTime = trace.getRefiningTime();
+
+        long totalModelExtractTime = 0;
+        long totalPopulationTime = 0;
+        long totalConsistencyCheckTime = 0;
+        long totalReasonComputationTime = 0;
+        long totalImplicationComputationTime = 0;
+        long totalNumReasons = 0;
+        long totalNumReducedReasons = 0;
+        long totalNumImplications = 0;
+        long totalModelSize = 0;
+        long minModelSize = Long.MAX_VALUE;
+        long maxModelSize = Long.MIN_VALUE;
+
+        for (EazyWMMSolver.Statistics stats : statList) {
+            totalModelExtractTime += stats.getModelExtractionTime();
+            totalPopulationTime += stats.getPopulationTime();
+            totalConsistencyCheckTime += stats.getConsistencyCheckTime();
+            if (hasReasons) {
+                totalReasonComputationTime += stats.getBaseReasonComputationTime() + stats.getCoreReasonComputationTime();
+                totalNumReasons += stats.getNumComputedCoreReasons();
+                totalNumReducedReasons += stats.getNumComputedReducedCoreReasons();
+            }
+            totalImplicationComputationTime +=
+                    stats.getBaseImplicationComputationTime() + stats.getCoreImplicationComputationTime();
+            totalNumImplications += stats.getNumComputedCoreImplications();
+
+            totalModelSize += stats.getModelSize();
+            minModelSize = Math.min(stats.getModelSize(), minModelSize);
+            maxModelSize = Math.max(stats.getModelSize(), maxModelSize);
+        }
+
+        StringBuilder message = new StringBuilder().append("Summary").append("\n")
+                .append(" ======== Summary ========").append("\n")
+                .append("Number of iterations: ").append(trace.iterations.size()).append("\n")
+                .append("Total native solving time: ").append(toTimeString(totalNativeSolvingTime)).append("\n")
+                .append("   -- Bound check time: ").append(toTimeString(boundCheckTime)).append("\n")
+                .append("Total CAAT solving time: ").append(toTimeString(totalCaatTime)).append("\n")
+                .append("   -- Model extraction time: ").append(toTimeString(totalModelExtractTime)).append("\n")
+                .append("   -- Population time: ").append(toTimeString(totalPopulationTime)).append("\n");
+        if (hasReasons) {
+            message.append("   -- Consistency check time: ").append(toTimeString(totalConsistencyCheckTime)).append("\n")
+                    .append("   -- Reason computation time: ").append(toTimeString(totalReasonComputationTime)).append("\n");
+        }
+        message.append("   -- Implication computation time: ")
+                .append(toTimeString(totalImplicationComputationTime)).append("\n")
+                .append("   -- Refining time: ").append(toTimeString(totalRefiningTime)).append("\n");
+        if (hasReasons) {
+            message.append("   -- #Computed core reasons: ").append(totalNumReasons).append("\n")
+                    .append("   -- #Computed core reduced reasons: ").append(totalNumReducedReasons).append("\n");
+        }
+        message.append("   -- #Computed core implications: ").append(totalNumImplications).append("\n");
+        if (!statList.isEmpty()) {
+            message.append("   -- Min model size (#events): ").append(minModelSize).append("\n")
+                    .append("   -- Average model size (#events): ").append(totalModelSize / statList.size())
+                    .append("\n")
+                    .append("   -- Max model size (#events): ").append(maxModelSize).append("\n");
+        }
+
+        return message.toString();
+    }
+
+    public static class EazyIrreflexivity extends Irreflexivity {
+        public EazyIrreflexivity(final Irreflexivity irreflexivity) {
+            super(irreflexivity.getRelation(), irreflexivity.isNegated(), irreflexivity.isFlagged());
+        }
+
+        @Override
+        public List<? extends Relation> getConstrainedRelations() {
+            return Collections.emptyList();
+        }
+    }
+}
