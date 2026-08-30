@@ -11,7 +11,6 @@ import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
-import com.dat3m.dartagnan.wmm.definition.Inverse;
 import com.dat3m.dartagnan.wmm.definition.SetIdentity;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
@@ -111,14 +110,8 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
         final List<IndexedSet<Event>> curSets = new ArrayList<>();
         Relation lastRel = null;
         int i = 0;
-        for (Definition definition : components) {
-            Relation relation = definition.getDefinedRelation();
-            boolean isInverse = false;
-            if (definition instanceof Inverse inverse) {
-                isInverse = true;
-                relation = inverse.getOperand();
-                definition = relation.getDefinition();
-            }
+        for (final Definition definition : components) {
+            final Relation relation = definition.getDefinedRelation();
             if (definition instanceof final SetIdentity setIdentity) {
                 final Relation set = setIdentity.getDomain();
                 final RelationAnalysis.Knowledge k = relationAnalysis.getKnowledge(set);
@@ -130,7 +123,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
                 }
             }
             final VarGraph graph = relationGraphMap.computeIfAbsent(relation, rel -> new VarGraph(rel, domain.size(), context.getBooleanFormulaManager()));
-            final Pattern.Edge patternEdge = i++ == components.size() - 1 ? pattern.appendLastPatternEdge(graph, isInverse, curSets) : pattern.appendPatternEdge(graph, isInverse, curSets);
+            final Pattern.Edge patternEdge = i++ == components.size() - 1 ? pattern.appendLastPatternEdge(graph, false, curSets) : pattern.appendPatternEdge(graph, false, curSets);
             patternEdges.computeIfAbsent(relation, k -> new ArrayList<>()).add(patternEdge);
             curSets.clear();
             lastRel = relation;
