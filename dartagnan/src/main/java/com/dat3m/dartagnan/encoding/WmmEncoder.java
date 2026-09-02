@@ -294,11 +294,11 @@ public class WmmEncoder {
         ra.getContradictions().apply((e1, e2) -> enc.add(bmgr.not(context.execution(e1, e2))));
     }
 
-    private EventGraph getActiveSet(Definition definition) {
+    public EventGraph getActiveSet(Definition definition) {
         return activeSetAnalysis.getActiveSet(definition);
     }
 
-    private EventGraph getRelevantSet(Axiom axiom) {
+    public EventGraph getRelevantSet(Axiom axiom) {
         return activeSetAnalysis.getRelevantSet(axiom);
     }
 
