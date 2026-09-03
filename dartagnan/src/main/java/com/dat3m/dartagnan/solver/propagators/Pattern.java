@@ -27,8 +27,8 @@ public class Pattern {
         return node;
     }
 
-    public Edge addPatternEdge(final VarGraph graph, final Node from, final Node to, final boolean isInverse) {
-        final Edge edge = new Edge(graph, from, to, edges.size(), isInverse);
+    public Edge addPatternEdge(final VarGraph graph, final Node from, final Node to) {
+        final Edge edge = new Edge(graph, from, to, edges.size());
         edges.add(edge);
         return edge;
     }
@@ -36,7 +36,7 @@ public class Pattern {
     public Edge appendPatternEdge(final VarGraph graph, final boolean isInverse) {
         final Node lastNode = nodes.isEmpty() ? addPatternNode() : nodes.get(nodes.size() - 1);
         final Node newNode = addPatternNode();
-        return addPatternEdge(graph, isInverse ? newNode : lastNode, isInverse ? lastNode : newNode, isInverse);
+        return addPatternEdge(graph, isInverse ? newNode : lastNode, isInverse ? lastNode : newNode);
     }
 
     public Edge appendLastPatternEdge(final VarGraph graph, final boolean isInverse) {
@@ -49,7 +49,7 @@ public class Pattern {
             firstNode = nodes.get(0);
             lastNode = nodes.get(nodes.size() - 1);
         }
-        return addPatternEdge(graph, isInverse ? firstNode : lastNode, isInverse ? lastNode : firstNode, isInverse);
+        return addPatternEdge(graph, isInverse ? firstNode : lastNode, isInverse ? lastNode : firstNode);
     }
 
     public void build() {
@@ -84,12 +84,6 @@ public class Pattern {
     }
 
     public MatchingResult addEdge(final Edge edge, int from, int to) {
-        if (edge.isInverse) {
-            final int tmpFrom = from;
-            from = to;
-            to = tmpFrom;
-        }
-
         final int numOfNodes = nodes.size();
         final Node fromNode = edge.from;
         final Node toNode = edge.to;
@@ -292,12 +286,13 @@ public class Pattern {
     }
 
     public void removeEdge(final Edge edge, final int from, final int to) {
-        final int newFrom = edge.isInverse() ? to : from;
-        final int newTo = edge.isInverse() ? from : to;
-
         final int fromId = edge.from.id;
         final int toId = edge.to.id;
-        partialMatches.removeIf(m -> m[fromId] == newFrom && m[toId] == newTo);
+        partialMatches.removeIf(m -> {
+            final Integer fromEvent = m[fromId];
+            final Integer toEvent = m[toId];
+            return fromEvent != null && fromEvent == from && toEvent != null && toEvent == to;
+        });
     }
 
     public void push() {
@@ -330,7 +325,7 @@ public class Pattern {
         public boolean equals(Object obj) { return this == obj; }
     }
 
-    public record Edge(VarGraph graph, Node from, Node to, int id, boolean isInverse) {
+    public record Edge(VarGraph graph, Node from, Node to, int id) {
         @Override
         public String toString() {
             return String.format("%s-%s->%s", from, graph.getName(), to);
