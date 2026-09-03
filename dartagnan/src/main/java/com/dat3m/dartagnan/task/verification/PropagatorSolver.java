@@ -63,9 +63,10 @@ public class PropagatorSolver extends SMTModelChecker<VerificationTask> implemen
         for (Constraint c : task.getMemoryModel().getAxioms()) {
             if (c instanceof Irreflexivity irref) {
                 final Definition def = irref.getRelation().getDefinition();
-                if (def instanceof Composition) {
+                if (def instanceof final Composition composition) {
                     axiomsToPropagate.add(irref);
-                    constraintsToEncode.add(def);
+                    constraintsToEncode.add(composition.getLeftOperand().getDefinition());
+                    constraintsToEncode.add(composition.getRightOperand().getDefinition());
                 }
             } else {
                 constraintsToEncode.add(c);
