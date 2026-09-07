@@ -479,7 +479,7 @@ public class RefinementSolver extends ModelChecker {
         );
     }
 
-    protected static Set<Constraint> generateCut(Wmm model) {
+    public static Set<Constraint> generateCut(Wmm model) {
         // We cut (i) negated axioms, (ii) negated relations (if derived),
         // and (iii) some special relations because they are derived from internal relations (like data/addr/ctrl)
         // or because we have no dedicated implementation for them in CAAT (like Linux' rscs).
