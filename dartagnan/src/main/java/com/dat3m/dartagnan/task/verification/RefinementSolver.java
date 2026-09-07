@@ -613,7 +613,7 @@ public class RefinementSolver extends SMTModelChecker<VerificationTask> implemen
         If we want to get all violations of an execution, we could take the found execution (under the new memory model)
         and simply recompute it under the original memory model, giving us the precise violations.
      */
-    private void instrumentPolaritySeparation(Wmm wmm) {
+    protected void instrumentPolaritySeparation(Wmm wmm) {
         final PolaritySeparator separator = computePolaritySeparator(wmm);
         final List<Difference> negDiff = separator.negatives().stream()
                 .filter(Difference.class::isInstance).map(Difference.class::cast)

@@ -25,12 +25,14 @@ import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
 import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
 import com.dat3m.dartagnan.wmm.definition.*;
+import com.dat3m.dartagnan.wmm.processing.EmptinessToIrreflexivity;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import com.dat3m.dartagnan.wmm.utils.graph.mutable.MapEventGraph;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.sosy_lab.common.configuration.Configuration;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
 import org.sosy_lab.common.configuration.Option;
 import org.sosy_lab.common.configuration.Options;
@@ -144,6 +146,22 @@ public class AxiomRefinementSolver extends RefinementSolver {
 
     public static AxiomRefinementSolver create(VerificationTask task) throws InvalidConfigurationException  {
         return new AxiomRefinementSolver(task);
+    }
+
+    protected Context preprocessAndAnalyze(Task task) throws InvalidConfigurationException {
+        final Configuration config = task.getConfig();
+
+        preprocessProgram(task, config);
+        preprocessMemoryModel(task);
+        instrumentPolaritySeparation(task.getMemoryModel());
+
+        EmptinessToIrreflexivity.newInstance().run(task.getMemoryModel());
+
+        final Context analysisContext = Context.create();
+        performStaticProgramAnalyses(task, analysisContext, config);
+        performStaticWmmAnalyses(task, analysisContext, config);
+        performIntervalAnalysis(task, analysisContext, config);
+        return analysisContext;
     }
 
     @Override
