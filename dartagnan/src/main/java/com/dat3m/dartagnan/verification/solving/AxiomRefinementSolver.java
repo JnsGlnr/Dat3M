@@ -26,6 +26,10 @@ import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
 import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.definition.*;
+import com.dat3m.dartagnan.wmm.processing.EmptinessToIrreflexivity;
+import com.dat3m.dartagnan.wmm.processing.MergeIrreflexivities;
+import com.dat3m.dartagnan.wmm.processing.RemoveDeadRelations;
+import com.dat3m.dartagnan.wmm.processing.SimplifyIrreflexivities;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import com.dat3m.dartagnan.wmm.utils.graph.mutable.MapEventGraph;
 import com.google.common.collect.Iterables;
@@ -157,6 +161,11 @@ public class AxiomRefinementSolver extends RefinementSolver {
         // ------------------------ Preprocessing / Analysis ------------------------
         final Collection<Constraint> biases = addBiases(memoryModel);
         preprocess(task);
+
+        EmptinessToIrreflexivity.newInstance().run(memoryModel);
+        SimplifyIrreflexivities.fromConfig(config).run(memoryModel);
+        MergeIrreflexivities.newInstance().run(memoryModel);
+        RemoveDeadRelations.newInstance().run(memoryModel);
 
         final Context analysisContext = Context.create();
         performStaticProgramAnalyses(task, analysisContext, config);

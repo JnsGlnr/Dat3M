@@ -37,7 +37,7 @@ public class RemoveDeadRelations implements WmmProcessor {
                 .forEach(memoryModel::deleteRelation);
     }
 
-    private final static class DependencyCollector implements Constraint.Visitor<Void> {
+    final static class DependencyCollector implements Constraint.Visitor<Void> {
         private final Set<Relation> collectedRelations = new HashSet<>();
         @Override
         public Void visitConstraint(Constraint constraint) {
@@ -47,6 +47,10 @@ public class RemoveDeadRelations implements WmmProcessor {
                 }
             }
             return null;
+        }
+
+        Set<Relation> getCollectedRelations() {
+            return new HashSet<>(collectedRelations);
         }
     }
 }

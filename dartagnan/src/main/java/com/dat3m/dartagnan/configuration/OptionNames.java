@@ -66,6 +66,7 @@ public class OptionNames {
     public static final String WMM_LOCALLY_CONSISTENT = "wmm.analysis.assumeLocalConsistency";
     public static final String RELATION_ANALYSIS = "wmm.analysis.relationAnalysis";
     public static final String ENABLE_EXTENDED_RELATION_ANALYSIS = "wmm.analysis.extendedRelationAnalysis";
+    public static final String SIMPLIFY_ENCODED_IRREFLEXIVITY_RELATIONS = "wmm.processing.simplifyEncodedIrreflexivityRelations";
 
     // Axiom Refinement Options
     public static final String BASE_METHOD = "axiomRefinement.baseMethod";
