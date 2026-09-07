@@ -76,6 +76,9 @@ public class OptionNames {
     // Refinement Options
     public static final String SYMMETRIC_LEARNING = "refinement.symmetricLearning";
 
+    // Propagator Options
+    public static final String PARTIAL_PATTERN_MATCHING = "propagator.partialPatternMatching";
+
     // SMT solver Options
     public static final String PHANTOM_REFERENCES = "solver.z3.usePhantomReferences";
 
