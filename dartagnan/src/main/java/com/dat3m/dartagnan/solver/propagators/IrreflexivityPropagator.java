@@ -5,12 +5,17 @@ import com.dat3m.dartagnan.encoding.WmmEncoder;
 import com.dat3m.dartagnan.program.analysis.EventDomainRepository;
 import com.dat3m.dartagnan.program.event.Event;
 import com.dat3m.dartagnan.utils.collections.IndexedDomain;
+import com.dat3m.dartagnan.utils.collections.IndexedSet;
+import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
-import com.dat3m.dartagnan.wmm.definition.Composition;
 import com.dat3m.dartagnan.wmm.definition.Inverse;
+import com.dat3m.dartagnan.wmm.definition.SetIdentity;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
+import org.sosy_lab.common.configuration.InvalidConfigurationException;
+import org.sosy_lab.common.configuration.Option;
+import org.sosy_lab.common.configuration.Options;
 import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 import org.sosy_lab.java_smt.api.PropagatorBackend;
@@ -20,7 +25,16 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
+import static com.dat3m.dartagnan.configuration.OptionNames.PARTIAL_PATTERN_MATCHING;
+
+@Options
 public class IrreflexivityPropagator extends AbstractUserPropagator {
+
+    @Option(name=PARTIAL_PATTERN_MATCHING,
+            description="Maintain partial patterns during pattern matching",
+            secure=true,
+            toUppercase=true)
+    private boolean usePartialPatternMatching = false;
 
     private static final boolean enableTheoryPropagation = true;
     // Might weaken propagation/learning if set to true?
@@ -55,7 +69,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
     private long numChecks = 0;
 
 
-    public IrreflexivityPropagator(WmmEncoder wmmEncoder, EncodingContext ctx) {
+    private IrreflexivityPropagator(WmmEncoder wmmEncoder, EncodingContext ctx) {
         this.context = ctx;
         this.relationAnalysis = ctx.getAnalysisContext().requires(RelationAnalysis.class);
         this.wmmEncoder = wmmEncoder;
@@ -65,35 +79,61 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
         this.bmgr = context.getBooleanFormulaManager();
     }
 
-    public void registerAxiom(Irreflexivity axiom) {
-        if (cases.stream().anyMatch(c -> c.axiom() == axiom)) {
+    public static IrreflexivityPropagator withContext(final EncodingContext context, final WmmEncoder wmmEncoder)
+            throws InvalidConfigurationException {
+        final IrreflexivityPropagator propagator = new IrreflexivityPropagator(wmmEncoder, context);
+        context.getTask().getConfig().inject(propagator);
+        return propagator;
+    }
+
+    public record AxiomWithComponents(Irreflexivity axiom, List<Definition> components) {
+    }
+
+    public void registerAxiom(AxiomWithComponents axiom) {
+        if (cases.stream().anyMatch(c -> c.axiom() == axiom.axiom())) {
             return;
         }
-        final Pattern pattern = new Pattern();
-        final Map<Relation, List<Pattern.Edge>> patternEdges = new LinkedHashMap<>(4);
-        if (axiom.getRelation().getDefinition() instanceof Composition comp) {
-            Relation leftRel = comp.getLeftOperand();
-            boolean isInverse = false;
-            if (leftRel.getDefinition() instanceof Inverse inverse) {
-                isInverse = true;
-                leftRel = inverse.getOperand();
-            }
-            final VarGraph leftGraph = relationGraphMap.computeIfAbsent(leftRel, rel -> new VarGraph(rel, domain.size(), context.getBooleanFormulaManager()));
-            patternEdges.computeIfAbsent(leftRel, k -> new ArrayList<>()).add(pattern.appendPatternEdge(leftGraph, isInverse));
-
-            Relation rightRel = comp.getRightOperand();
-            isInverse = false;
-            if (rightRel.getDefinition() instanceof Inverse inverse) {
-                isInverse = true;
-                rightRel = inverse.getOperand();
-            }
-            final VarGraph rightGraph = relationGraphMap.computeIfAbsent(rightRel, rel -> new VarGraph(rel, domain.size(), context.getBooleanFormulaManager()));
-            patternEdges.computeIfAbsent(rightRel, k -> new ArrayList<>()).add(pattern.appendLastPatternEdge(rightGraph, isInverse));
-
-            pattern.build();
-            final Case c = new Case(axiom, pattern, patternEdges);
-            cases.add(c);
+        final List<Definition> components = axiom.components();
+        if (components.size() == 1) {
+            return;
         }
+        final Pattern pattern = usePartialPatternMatching ? new PartiallyMatchablePattern(domain) : new SimplePattern(domain);
+        final Map<Relation, List<Pattern.Edge>> patternEdges = new LinkedHashMap<>();
+        final List<IndexedSet<Event>> curSets = new ArrayList<>();
+        Relation lastRel = null;
+        int i = 0;
+        for (Definition definition : components) {
+            Relation relation = definition.getDefinedRelation();
+            boolean isInverse = false;
+            if (definition instanceof Inverse inverse) {
+                isInverse = true;
+                relation = inverse.getOperand();
+                definition = relation.getDefinition();
+            }
+            if (definition instanceof final SetIdentity setIdentity) {
+                final Relation set = setIdentity.getDomain();
+                final RelationAnalysis.Knowledge k = relationAnalysis.getKnowledge(set);
+                final EventGraph must = k.getMustSet();
+                if (k.getMaySet().size() == must.size()) {
+                    curSets.add((IndexedSet<Event>) must.getDomain());
+                    ++i;
+                    continue;
+                }
+            }
+            final VarGraph graph = relationGraphMap.computeIfAbsent(relation, rel -> new VarGraph(rel, domain.size(), context.getBooleanFormulaManager()));
+            final Pattern.Edge patternEdge = i++ == components.size() - 1 ? pattern.appendLastPatternEdge(graph, isInverse, curSets) : pattern.appendPatternEdge(graph, isInverse, curSets);
+            patternEdges.computeIfAbsent(relation, k -> new ArrayList<>()).add(patternEdge);
+            curSets.clear();
+            lastRel = relation;
+        }
+        if (!curSets.isEmpty()) {
+            final Pattern.Edge outdatedEdge = pattern.closeBuild(curSets);
+            final Pattern.Edge closingEdge = pattern.edges.getLast();
+            patternEdges.getOrDefault(lastRel, new ArrayList<>()).replaceAll(edge -> edge == outdatedEdge ? closingEdge : edge);
+        }
+        pattern.build();
+        final Case c = new Case(axiom.axiom(), pattern, patternEdges);
+        cases.add(c);
     }
 
     @Override
@@ -146,14 +186,16 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
                 }
             }
         }
-        for (final PatternGraph patternGraph : relToEdges.values()) {
-            final VarGraph graph = patternGraph.graph();
-            for (final Map.Entry<Pattern, List<Pattern.Edge>> patternEdges : patternGraph.patternEdges().entrySet()) {
-                final Pattern pattern = patternEdges.getKey();
-                for (final Pattern.Edge edge : patternEdges.getValue()) {
-                    for (final VarGraph.Edge graphEdge : graph.allEdges) {
-                        if (graphEdge.isMust()) {
-                            pattern.addEdge(edge, graphEdge.getSource(), graphEdge.getTarget());
+        if (usePartialPatternMatching) {
+            for (final PatternGraph patternGraph : relToEdges.values()) {
+                final VarGraph graph = patternGraph.graph();
+                for (final Map.Entry<Pattern, List<Pattern.Edge>> patternEdges : patternGraph.patternEdges().entrySet()) {
+                    final Pattern pattern = patternEdges.getKey();
+                    for (final Pattern.Edge edge : patternEdges.getValue()) {
+                        for (final VarGraph.Edge graphEdge : graph.allEdges) {
+                            if (graphEdge.isMust()) {
+                                pattern.addEdge(edge, graphEdge.getSource(), graphEdge.getTarget());
+                            }
                         }
                     }
                 }
@@ -236,7 +278,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
         final int target = edge.getTarget();
         for (final Pattern.Edge patternEdge : patternEdges) {
             final Pattern.MatchingResult result = pattern.addEdge(patternEdge, source, target);
-            for (final Integer[] match : result.matches()) {
+            for (final int[] match : result.matches()) {
                 // We found a cycle
                 final List<BooleanFormula> conflict = computeCycleReason(pattern, match);
                 trackReason(conflict);
@@ -244,7 +286,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
                 raisedConflict = true;
             }
             if (enableTheoryPropagation) {
-                for (final Integer[] match : result.theoryPropagations()) {
+                for (final int[] match : result.theoryPropagations()) {
                     final PropagationResult prop = propagate(pattern, match);
                     if (prop != null) {
                         final BooleanFormula[] propReason = prop.reason().toArray(new BooleanFormula[0]);
@@ -256,13 +298,13 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
         }
     }
 
-    private List<BooleanFormula> computeCycleReason(Pattern pattern, Integer[] match) {
+    private List<BooleanFormula> computeCycleReason(Pattern pattern, int[] match) {
         final List<BooleanFormula> conflictVars = new ArrayList<>();
         for (final Pattern.Edge patternEdge : pattern.edges) {
             final VarGraph graph = patternEdge.graph();
             final int source = match[patternEdge.from().id()];
             final int target = match[patternEdge.to().id()];
-            final VarGraph.Edge edge = graph.findEdge(source, target);
+            final VarGraph.Edge edge = graph.getEdge(source, target);
             if (!edge.isMust()) {
                 conflictVars.add(edge.getEdgeVar());
             }
@@ -270,24 +312,26 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
         return conflictVars;
     }
 
-    private PropagationResult propagate(Pattern pattern, Integer[] match) {
+    private PropagationResult propagate(Pattern pattern, int[] match) {
         final List<BooleanFormula> reason = new ArrayList<>();
         final List<BooleanFormula> consequence = new ArrayList<>();
         final List<VarGraph.Edge> propagatedEdges = new ArrayList<>();
         for (final Pattern.Edge patternEdge : pattern.edges) {
             final VarGraph graph = patternEdge.graph();
-            final int source = match[patternEdge.from().id()];
-            final int target = match[patternEdge.to().id()];
-            if (graph.contains(source, target)) {
-                final VarGraph.Edge edge = graph.findEdge(source, target);
+            final Pattern.Node fromNode = patternEdge.from();
+            final Pattern.Node toNode = patternEdge.to();
+            final int source = match[fromNode.id()];
+            final int target = match[toNode.id()];
+            final VarGraph.Edge edge = graph.containsWithEdge(source, target);
+            if (edge != null) {
                 if (!edge.isMust()) {
                     reason.add(edge.getEdgeVar());
                 }
             } else {
-                if (graph.hasEdge(source, target)) {
-                    final VarGraph.Edge edge = graph.findEdge(source, target);
-                    consequence.add(edge.getNegEdgeVar());
-                    propagatedEdges.add(edge);
+                final VarGraph.Edge propEdge = graph.findEdge(source, target);
+                if (propEdge != null && fromNode.check(source) && toNode.check(target)) {
+                    consequence.add(propEdge.getNegEdgeVar());
+                    propagatedEdges.add(propEdge);
                 }
             }
         }

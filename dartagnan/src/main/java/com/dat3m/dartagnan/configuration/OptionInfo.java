@@ -13,6 +13,7 @@ import com.dat3m.dartagnan.program.processing.libraries.AbstractLibrary;
 import com.dat3m.dartagnan.program.processing.libraries.PthreadLibrary;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreReasoner;
 import com.dat3m.dartagnan.program.ProgramPrinter;
+import com.dat3m.dartagnan.solver.propagators.IrreflexivityPropagator;
 import com.dat3m.dartagnan.task.TaskSolverBase;
 import com.dat3m.dartagnan.task.verification.VerificationTaskSolver;
 import com.dat3m.dartagnan.task.enumeration.EnumerationSolver;
@@ -71,7 +72,8 @@ public final class OptionInfo implements Comparable<OptionInfo> {
                 SvcompOutputGenerator.class,
                 Program.SemanticConfig.class,
                 AbstractLibrary.class,
-                PthreadLibrary.class
+                PthreadLibrary.class,
+                IrreflexivityPropagator.class
         );
     }
 

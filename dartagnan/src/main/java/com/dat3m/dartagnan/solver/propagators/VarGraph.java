@@ -112,22 +112,53 @@ public class VarGraph {
         return () -> it;
     }
 
-    public boolean contains(int e1, int e2) {
-        for (final Edge edge : outEdges[e1]) {
-            if (edge.getTarget() == e2 && edge.isTrue()) {
-                return true;
+    public int[] getTrueInIndices(int index) {
+        final List<Edge> inEdges = this.inEdges[index];
+        final int[] inIndices = new int[inEdges.size()];
+        int i = 0;
+        for (final Edge edge : inEdges) {
+            if (edge.isTrue()) {
+                inIndices[i++] = edge.getSource();
+            } else {
+                inIndices[i++] = -1;
             }
         }
-        return false;
+        return inIndices;
     }
 
-    public boolean hasEdge(int e1, int e2) {
-        for (final Edge edge : outEdges[e1]) {
-            if (edge.getTarget() == e2) {
-                return true;
+    public int[] getTrueOutIndices(int index) {
+        final List<Edge> outEdges = this.outEdges[index];
+        final int[] outIndices = new int[outEdges.size()];
+        int i = 0;
+        for (final Edge edge : outEdges) {
+            if (edge.isTrue()) {
+                outIndices[i++] = edge.getTarget();
+            } else {
+                outIndices[i++] = -1;
             }
         }
-        return false;
+        return outIndices;
+    }
+
+    public boolean contains(int e1, int e2) {
+        return containsWithEdge(e1, e2) != null;
+    }
+
+    public Edge containsWithEdge(int e1, int e2) {
+        for (final Edge edge : outEdges[e1]) {
+            if (edge.getTarget() == e2 && edge.isTrue()) {
+                return edge;
+            }
+        }
+        return null;
+    }
+
+    public Edge getEdge(int e1, int e2) {
+        final Edge edge = findEdge(e1, e2);
+        if (edge == null) {
+            throw new IllegalArgumentException("Edge does not exist");
+        }
+        return edge;
     }
 
     public Edge findEdge(int e1, int e2) {
@@ -136,7 +167,7 @@ public class VarGraph {
                 return edge;
             }
         }
-        throw new IllegalArgumentException("Edge does not exist");
+        return null;
     }
 
     private static boolean isEnabledEdge(Edge e) {

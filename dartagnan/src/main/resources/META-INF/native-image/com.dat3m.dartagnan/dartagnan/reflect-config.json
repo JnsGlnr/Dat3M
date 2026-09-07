@@ -155,6 +155,11 @@
         "queryAllDeclaredMethods":true
       },
       {
+        "name":"com.dat3m.dartagnan.solver.propagators.IrreflexivityPropagator",
+        "allDeclaredFields":true,
+        "queryAllDeclaredMethods":true
+      },
+      {
         "name":"com.dat3m.dartagnan.program.ProgramPrinter",
         "allDeclaredFields":true,
         "queryAllDeclaredMethods":true

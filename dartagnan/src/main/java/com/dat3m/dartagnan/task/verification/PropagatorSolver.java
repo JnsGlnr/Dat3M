@@ -10,7 +10,6 @@ import com.dat3m.dartagnan.task.Task;
 import com.dat3m.dartagnan.wmm.Constraint;
 import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
-import com.dat3m.dartagnan.wmm.definition.Composition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sosy_lab.common.configuration.Configuration;
@@ -23,6 +22,7 @@ import org.sosy_lab.java_smt.api.SolverException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.dat3m.dartagnan.solver.propagators.IrreflexivityPropagator.AxiomWithComponents;
 import static com.dat3m.dartagnan.task.verification.VerificationStatus.*;
 import static java.util.Collections.singletonList;
 
@@ -59,14 +59,15 @@ public class PropagatorSolver extends SMTModelChecker<VerificationTask> implemen
         final ProverWithTracker prover = this.prover;
 
         final List<Constraint> constraintsToEncode = new ArrayList<>();
-        final List<Irreflexivity> axiomsToPropagate = new ArrayList<>();
+        final List<AxiomWithComponents> axiomsToPropagate = new ArrayList<>();
         for (Constraint c : task.getMemoryModel().getAxioms()) {
             if (c instanceof Irreflexivity irref) {
-                final Definition def = irref.getRelation().getDefinition();
-                if (def instanceof final Composition composition) {
-                    axiomsToPropagate.add(irref);
-                    constraintsToEncode.add(composition.getLeftOperand().getDefinition());
-                    constraintsToEncode.add(composition.getRightOperand().getDefinition());
+                final List<Definition> components = irref.getComponents();
+                if (components.size() > 1) {
+                    axiomsToPropagate.add(new AxiomWithComponents(irref, components));
+                    constraintsToEncode.addAll(components);
+                } else {
+                    constraintsToEncode.add(c);
                 }
             } else {
                 constraintsToEncode.add(c);
@@ -79,8 +80,8 @@ public class PropagatorSolver extends SMTModelChecker<VerificationTask> implemen
         PropertyEncoder propertyEncoder = PropertyEncoder.withContext(context, wmmEncoder);
         SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
 
-        System.out.println("Propagating axioms: " + axiomsToPropagate);
-        IrreflexivityPropagator propagator = new IrreflexivityPropagator(wmmEncoder, context);
+        System.out.println("Propagating axioms: " + axiomsToPropagate.stream().map(AxiomWithComponents::axiom).toList());
+        IrreflexivityPropagator propagator = IrreflexivityPropagator.withContext(context, wmmEncoder);
         axiomsToPropagate.forEach(propagator::registerAxiom);
         prover.registerUserPropagator(propagator);
 

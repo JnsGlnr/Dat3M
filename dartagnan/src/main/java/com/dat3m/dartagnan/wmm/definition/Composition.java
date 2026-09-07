@@ -3,6 +3,9 @@ package com.dat3m.dartagnan.wmm.definition;
 import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 
 public class Composition extends Definition {
@@ -22,6 +25,22 @@ public class Composition extends Definition {
     @Override
     public List<Relation> getConstrainedRelations() {
         return List.of(definedRelation, left, right);
+    }
+
+    public List<Definition> getComponents() {
+        final List<Definition> components = new ArrayList<>();
+        final Deque<Definition> workList = new ArrayDeque<>();
+        workList.push(this);
+        while (!workList.isEmpty()) {
+            final Definition definition = workList.pop();
+            if (!(definition instanceof final Composition composition)) {
+                components.add(definition);
+            } else {
+                workList.push(composition.getRightOperand().getDefinition());
+                workList.push(composition.getLeftOperand().getDefinition());
+            }
+        }
+        return components;
     }
 
     @Override
