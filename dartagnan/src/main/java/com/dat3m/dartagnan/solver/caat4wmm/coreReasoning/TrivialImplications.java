@@ -19,10 +19,12 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<Event, List<Ev
             final Relation eazyRel = implicationsForConstraint.getKey();
             for (Map.Entry<Relation, Map<Event, List<Event>>> implicationsForConstraintAndRel : implicationsForConstraint.getValue().entrySet()) {
                 final Relation rel = implicationsForConstraintAndRel.getKey();
-                for (Map.Entry<Event, List<Event>> reasonsForEvent : implicationsForConstraintAndRel.getValue().entrySet()) {
-                    final Event first = reasonsForEvent.getKey();
-                    for (Event second : reasonsForEvent.getValue()) {
-                        enc.add(bmgr.implication(context.edge(rel, first, second), context.edge(eazyRel, first, second)));
+                if (rel != eazyRel) {
+                    for (Map.Entry<Event, List<Event>> reasonsForEvent : implicationsForConstraintAndRel.getValue().entrySet()) {
+                        final Event first = reasonsForEvent.getKey();
+                        for (Event second : reasonsForEvent.getValue()) {
+                            enc.add(bmgr.implication(context.edge(rel, first, second), context.edge(eazyRel, first, second)));
+                        }
                     }
                 }
             }
