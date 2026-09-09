@@ -5,7 +5,6 @@ import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 
 import java.util.*;
-import java.util.function.Predicate;
 
 public class VarGraph {
 
@@ -17,6 +16,7 @@ public class VarGraph {
     final Map<BooleanFormula, Edge> var2Edge = new HashMap<>();
     final List<Edge>[] inEdges;
     final List<Edge>[] outEdges;
+    final Edge[][] edgeMatrix;
     final List<Edge> allEdges = new ArrayList<>();
     final List<Edge> dynamicEdges = new ArrayList<>();
 
@@ -35,6 +35,7 @@ public class VarGraph {
 
         inEdges = (List<Edge>[]) new List[domainSize];
         outEdges = (List<Edge>[]) new List[domainSize];
+        edgeMatrix = new Edge[domainSize][domainSize];
         for (int i = 0; i < domainSize; i++) {
             inEdges[i] = new ArrayList<>();
             outEdges[i] = new ArrayList<>();
@@ -57,6 +58,7 @@ public class VarGraph {
         final Edge edge = new Edge(source, target, edgeVar);
         inEdges[target].add(edge);
         outEdges[source].add(edge);
+        edgeMatrix[source][target] = edge;
         allEdges.add(edge);
 
         if (!edge.isMust()) {
@@ -84,7 +86,6 @@ public class VarGraph {
 
     public void assignEdge(Edge e, int value) {
         assert value == TRUE || value == FALSE;
-        assert !e.isMust();
         trace.add(e);
         e.value = value;
     }
@@ -98,17 +99,13 @@ public class VarGraph {
         e.value = UNASSIGNED;
     }
 
-    public Iterable<Edge> getInEdges(int i) {
-        return inEdges[i];
-    }
-
     public Iterable<Edge> getTrueInEdges(int i) {
-        final var it = new FilteredIterator(inEdges[i], VarGraph::isEnabledEdge);
+        final var it = new EnabledIterator(inEdges[i]);
         return () -> it;
     }
 
     public Iterable<Edge> getTrueOutEdges(int i) {
-        final var it = new FilteredIterator(outEdges[i], VarGraph::isEnabledEdge);
+        final var it = new EnabledIterator(outEdges[i]);
         return () -> it;
     }
 
@@ -145,33 +142,19 @@ public class VarGraph {
     }
 
     public Edge containsWithEdge(int e1, int e2) {
-        for (final Edge edge : outEdges[e1]) {
-            if (edge.getTarget() == e2 && edge.isTrue()) {
-                return edge;
-            }
+        final Edge edge = edgeMatrix[e1][e2];
+        if (edge != null && edge.isTrue()) {
+            return edge;
         }
         return null;
     }
 
     public Edge getEdge(int e1, int e2) {
-        final Edge edge = findEdge(e1, e2);
+        final Edge edge = edgeMatrix[e1][e2];
         if (edge == null) {
             throw new IllegalArgumentException("Edge does not exist");
         }
         return edge;
-    }
-
-    public Edge findEdge(int e1, int e2) {
-        for (final Edge edge : outEdges[e1]) {
-            if (edge.getTarget() == e2) {
-                return edge;
-            }
-        }
-        return null;
-    }
-
-    private static boolean isEnabledEdge(Edge e) {
-        return e.value == TRUE;
     }
 
     @Override
@@ -179,25 +162,22 @@ public class VarGraph {
         return getName();
     }
 
-    private final static class FilteredIterator implements Iterator<Edge> {
+    private final static class EnabledIterator implements Iterator<Edge> {
         private final List<Edge> edges;
-        private final Predicate<Edge> filter;
         private int index = -1;
 
-        public FilteredIterator(List<Edge> edges, Predicate<Edge> filter) {
+        public EnabledIterator(List<Edge> edges) {
             this.edges = edges;
-            this.filter = filter;
             advance();
         }
 
         private void advance() {
             final List<Edge> edges = this.edges;
-            final Predicate<Edge> filter = this.filter;
             final int size = edges.size();
             int index = this.index;
             do {
                 index++;
-            } while (index < size && !filter.test(edges.get(index)));
+            } while (index < size && !edges.get(index).isTrue());
             this.index = index;
         }
 

@@ -47,24 +47,41 @@ public class SimplePattern extends Pattern {
 
         Edge nextEdgeToJoin;
         while ((nextEdgeToJoin = queue.pop(visited)) != null) {
-            final boolean joinAtSource = visited.add(nextEdgeToJoin.to());
-            final boolean joinAtTarget = visited.add(nextEdgeToJoin.from());
+            final Node fromNode = nextEdgeToJoin.from();
+            final Node toNode = nextEdgeToJoin.to();
+            final boolean joinAtSource = visited.add(toNode);
+            final boolean joinAtTarget = visited.add(fromNode);
             final boolean doPrune = !(joinAtSource || joinAtTarget);
 
             if (doPrune) {
                 curMatches = prune(curMatches, nextEdgeToJoin);
             } else {
-                final Node matchedNode = joinAtSource ? nextEdgeToJoin.from() : nextEdgeToJoin.to();
-                final Node unmatchedNode = joinAtSource ? nextEdgeToJoin.to() : nextEdgeToJoin.from();
+                final Node matchedNode = joinAtSource ? fromNode : toNode;
+                final Node unmatchedNode = joinAtSource ? toNode : fromNode;
                 final List<Match> nextMatches = new ArrayList<>();
                 for (int i = 0, matchSize = curMatches.size(); i < matchSize; ++i) {
                     final Match match = curMatches.get(i);
-                    final int[] joinedNodeIds = joinAlong(match, matchedNode, nextEdgeToJoin);
-                    for (final int nodeId : joinedNodeIds) {
-                        if (nodeId != -1) {
-                            if (unmatchedNode.check(nodeId)) {
+                    final int nodeMatch = match.atNode(matchedNode);
+                    if (nodeMatch == -1) {
+                        for (final VarGraph.Edge graphEdge : nextEdgeToJoin.graph().allEdges) {
+                            if (graphEdge.isTrue()) {
+                                final int source = graphEdge.getSource();
+                                final int target = graphEdge.getTarget();
+                                if (fromNode.check(source) && toNode.check(target)) {
+                                    nextMatches.add(match.with(fromNode, toNode, source, target));
+                                }
+                            }
+                        }
+                    } else {
+                        final int[] joinedNodeIds = joinAlong(nodeMatch, matchedNode, nextEdgeToJoin);
+                        for (final int nodeId : joinedNodeIds) {
+                            if (nodeId != -1 && unmatchedNode.check(nodeId)) {
                                 nextMatches.add(match.with(unmatchedNode, nodeId));
                             }
+                        }
+                        if (!match.hadConflict) {
+                            match.hadConflict = true;
+                            nextMatches.add(match);
                         }
                     }
                 }
@@ -80,8 +97,7 @@ public class SimplePattern extends Pattern {
         return Match.getMatchingResult(curMatches);
     }
 
-    private int[] joinAlong(final Match partialMatch, final Node node, final Edge edge) {
-        final int nodeMatch = partialMatch.atNode(node);
+    private int[] joinAlong(final int nodeMatch, final Node node, final Edge edge) {
         final VarGraph relationGraph = edge.graph();
         return edge.from() == node ? relationGraph.getTrueOutIndices(nodeMatch) : relationGraph.getTrueInIndices(nodeMatch);
     }
@@ -89,14 +105,35 @@ public class SimplePattern extends Pattern {
     private List<Match> prune(final List<Match> matches, final Edge edge) {
         final VarGraph relationGraph = edge.graph();
         final List<Match> remainingMatches = new ArrayList<>();
+        final Node from = edge.from();
+        final Node to = edge.to();
         for (final Match match : matches) {
-            final int source = match.atNode(edge.from());
-            final int target = match.atNode(edge.to());
-            if (relationGraph.contains(source, target)) {
-                remainingMatches.add(match);
-            } else if (!match.hadConflict) {
-                remainingMatches.add(match);
-                match.hadConflict = true;
+            final int source = match.atNode(from);
+            final int target = match.atNode(to);
+
+            final boolean joinAtSource = target == -1;
+            final boolean joinAtTarget = source == -1;
+            final boolean doPrune = !(joinAtSource || joinAtTarget);
+
+            if (doPrune) {
+                if (relationGraph.contains(source, target)) {
+                    remainingMatches.add(match);
+                } else if (!match.hadConflict) {
+                    remainingMatches.add(match);
+                    match.hadConflict = true;
+                }
+            } else {
+                final Node matchedNode = joinAtSource ? from : to;
+                final Node unmatchedNode = joinAtSource ? to : from;
+                final List<Match> nextMatches = new ArrayList<>();
+                final int nodeMatch = match.atNode(matchedNode);
+                final int[] joinedNodeIds = joinAlong(nodeMatch, matchedNode, edge);
+                for (final int nodeId : joinedNodeIds) {
+                    if (nodeId != -1 && unmatchedNode.check(nodeId)) {
+                        nextMatches.add(match.with(unmatchedNode, nodeId));
+                    }
+                }
+                remainingMatches.addAll(nextMatches);
             }
         }
         return remainingMatches;
@@ -188,8 +225,9 @@ public class SimplePattern extends Pattern {
         public int atNode(final Node node) { return nodeId2EventId[node.id()]; }
         private void setMatch(final Node node, final int id) { nodeId2EventId[node.id()] = id; }
 
-        private Match(final int[] mapping) {
+        private Match(final int[] mapping, final boolean hadConflict) {
             this.nodeId2EventId = mapping;
+            this.hadConflict = hadConflict;
         }
 
         public Match(final int size) {
@@ -200,7 +238,14 @@ public class SimplePattern extends Pattern {
         public Match with(final Node node, final int match) {
             final int[] updatedMatching = Arrays.copyOf(this.nodeId2EventId, this.nodeId2EventId.length);
             updatedMatching[node.id()] = match;
-            return new Match(updatedMatching);
+            return new Match(updatedMatching, hadConflict);
+        }
+
+        public Match with(final Node node1, final Node node2, final int match1, final int match2) {
+            final int[] updatedMatching = Arrays.copyOf(this.nodeId2EventId, this.nodeId2EventId.length);
+            updatedMatching[node1.id()] = match1;
+            updatedMatching[node2.id()] = match2;
+            return new Match(updatedMatching, hadConflict);
         }
 
         public int[] toArray() { return nodeId2EventId; }
