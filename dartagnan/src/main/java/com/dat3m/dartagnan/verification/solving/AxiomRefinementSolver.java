@@ -195,13 +195,13 @@ public class AxiomRefinementSolver extends RefinementSolver {
         final ProverWithTracker prover = this.prover;
 
         context = EncodingContext.of(task, analysisContext, ctx.getFormulaManager(), wmmConstraintsToEncode);
-        final TrivialImplications trivialImplications = getTrivialImplications(eazyConstraints);
         final ProgramEncoder programEncoder = ProgramEncoder.withContext(context);
         final WmmEncoder baselineEncoder = WmmEncoder.withContext(context);
         final PropertyEncoder propertyEncoder = PropertyEncoder.withContext(context, baselineEncoder);
         final SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
 
         final BooleanFormulaManager bmgr = ctx.getFormulaManager().getBooleanFormulaManager();
+        final TrivialImplications trivialImplications = getTrivialImplications(eazyConstraints);
         final boolean computeCoreReasons = baseMethod == Method.LAZY;
         final EazyWMMSolver solver = EazyWMMSolver.withContext(context, eazyConstraints, trivialImplications, computeCoreReasons);
         final EazyRefiner refiner = EazyRefiner.newInstance();
@@ -482,12 +482,19 @@ public class AxiomRefinementSolver extends RefinementSolver {
 
     private TrivialImplications getTrivialImplications(Collection<? extends Constraint> eazyConstraints) {
         final RelationAnalysis ra = context.getAnalysisContext().requires(RelationAnalysis.class);
+        final ActiveSetAnalysis asa = context.getAnalysisContext().requires(ActiveSetAnalysis.class);
         final Map<Relation, Map<Relation, Map<Event, List<Event>>>> result = new HashMap<>();
         for (Constraint eazyConstraint : eazyConstraints) {
             for (final Definition eazyDef : getEazyDefinitions(eazyConstraint)) {
                 final Relation eazyRel = eazyDef.getDefinedRelation();
                 if (!result.containsKey(eazyRel)) {
-                    result.put(eazyRel, getTrivialImplications(eazyRel, ra));
+                    final EventGraph encodeSet;
+                    if (eazyConstraint instanceof final Axiom axiom && eazyRel == axiom.getRelation()) {
+                        encodeSet = asa.getRelevantSet(axiom);
+                    } else {
+                        encodeSet = asa.getActiveSet(eazyDef);
+                    }
+                    result.put(eazyRel, getTrivialImplications(eazyRel, ra, encodeSet));
                 }
             }
         }
@@ -508,7 +515,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
         }
     }
 
-    private Map<Relation, Map<Event, List<Event>>> getTrivialImplications(final Relation eazyRel, final RelationAnalysis ra) {
+    private Map<Relation, Map<Event, List<Event>>> getTrivialImplications(final Relation eazyRel, final RelationAnalysis ra, final EventGraph encodeSet) {
         final Set<Definition> visited = new HashSet<>();
         final Map<Relation, Map<Event, List<Event>>> trivialImplications = new HashMap<>();
         final EventGraph must = ra.getKnowledge(eazyRel).getMustSet();
@@ -525,7 +532,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
                         final Relation rel = definition.getDefinedRelation();
                         final Map<Event, List<Event>> events = new HashMap<>();
                         ra.getKnowledge(rel).getMaySet().apply((e1, e2) -> {
-                            if (!must.contains(e1, e2)) {
+                            if (!must.contains(e1, e2) && encodeSet.contains(e1, e2)) {
                                 for (EventGraph sideCondition : constraintWithConditions.sideConditions) {
                                     if (!sideCondition.contains(e1, e2)) {
                                         return;
