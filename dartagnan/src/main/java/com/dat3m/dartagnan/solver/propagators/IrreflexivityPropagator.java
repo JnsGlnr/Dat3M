@@ -262,7 +262,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
                 System.out.println("numChecks: " + numChecks);
                 printStatistics();
             }
-        } else {
+        } else if (usePartialPatternMatching) {
             final int source = edge.getSource();
             final int target = edge.getTarget();
             for (final Map.Entry<Pattern, List<Pattern.Edge>> patternEdges : patternGraph.patternEdges().entrySet()) {
@@ -328,7 +328,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
                     reason.add(edge.getEdgeVar());
                 }
             } else {
-                final VarGraph.Edge propEdge = graph.findEdge(source, target);
+                final VarGraph.Edge propEdge = graph.edgeMatrix[source][target];
                 if (propEdge != null && fromNode.check(source) && toNode.check(target)) {
                     consequence.add(propEdge.getNegEdgeVar());
                     propagatedEdges.add(propEdge);
