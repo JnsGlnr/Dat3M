@@ -12,6 +12,7 @@ import com.dat3m.dartagnan.program.event.core.*;
 import com.dat3m.dartagnan.program.memory.FinalMemoryValue;
 import com.dat3m.dartagnan.smt.EncodingUtils;
 import com.dat3m.dartagnan.smt.FormulaManagerExt;
+import com.dat3m.dartagnan.verification.solving.AxiomRefinementSolver;
 import com.dat3m.dartagnan.wmm.*;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.axiom.*;
@@ -983,6 +984,14 @@ public class WmmEncoder {
             });
 
             return axiom.isNegated() ? bmgr.or(edges) : bmgr.and(edges.stream().map(bmgr::not).toList());
+        }
+
+        @Override
+        public BooleanFormula visitEazyIrreflexivity(AxiomRefinementSolver.EazyIrreflexivity axiom) {
+            final ConstraintEncoder compositionEncoder = new ConstraintEncoder();
+            axiom.collectCompositions().forEach(compositionEncoder::visitComposition);
+            final BooleanFormula compositionEnc = compositionEncoder.bmgr.and(compositionEncoder.enc);
+            return compositionEncoder.bmgr.and(compositionEnc, visitIrreflexivity(axiom));
         }
 
         // ------------------------------------------------------------------------

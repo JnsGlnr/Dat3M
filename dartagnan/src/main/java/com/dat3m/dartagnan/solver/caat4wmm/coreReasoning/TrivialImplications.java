@@ -2,10 +2,7 @@ package com.dat3m.dartagnan.solver.caat4wmm.coreReasoning;
 
 import com.dat3m.dartagnan.encoding.EncodingContext;
 import com.dat3m.dartagnan.program.event.Event;
-import com.dat3m.dartagnan.wmm.Constraint;
-import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
-import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 
@@ -31,16 +28,6 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<Event, List<Ev
             }
         }
         return bmgr.and(enc);
-    }
-
-    public boolean isEazy(Constraint constraint) {
-        if (constraint instanceof Axiom axiom) {
-            return trivialImplications.containsKey(axiom.getRelation());
-        } else if (constraint instanceof Definition def) {
-            return trivialImplications.containsKey(def.getDefinedRelation());
-        } else {
-            throw new UnsupportedOperationException("Unsupported constraint type: " + constraint.getClass().getSimpleName());
-        }
     }
 
     public boolean isTrivial(Relation reasonRel, Relation impliedRel, Event event) {
