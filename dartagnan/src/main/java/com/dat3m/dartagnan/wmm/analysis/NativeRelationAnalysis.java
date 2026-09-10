@@ -48,6 +48,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Lists.reverse;
+import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static java.util.stream.IntStream.iterate;
@@ -1217,6 +1218,7 @@ public class NativeRelationAnalysis implements RelationAnalysis {
             Map<Relation, ExtendedDelta> map = new HashMap<>();
             if (origin.equals(r0)) {
                 map.put(r1, new ExtendedDelta(IndexedEventGraph.difference(disabled, knowledgeMap.get(r2).getMaySet()), enabled));
+                map.put(r2, new ExtendedDelta(enabled, IndexedEventGraph.intersection(disabled, knowledgeMap.get(r1).getMustSet())));
             }
             if (origin.equals(r1)) {
                 map.put(r0, new ExtendedDelta(disabled, IndexedEventGraph.difference(enabled, knowledgeMap.get(r2).getMaySet())));
@@ -1418,6 +1420,20 @@ public class NativeRelationAnalysis implements RelationAnalysis {
             return Map.of(
                     r0, new ExtendedDelta(d0, e0),
                     r1, new ExtendedDelta(d1, newGraphWithDomain(d1)));
+        }
+
+        @Override
+        public Map<Relation, ExtendedDelta> visitSetIdentity(SetIdentity setIdentity) {
+            final Relation r0 = setIdentity.getDefinedRelation();
+            final Relation r1 = setIdentity.getDomain();
+            if (origin.equals(r0)) {
+                return Map.of(r1, new ExtendedDelta(disabled, enabled));
+            }
+
+            if (origin.equals(r1)) {
+                return Map.of(r0, new ExtendedDelta(disabled, enabled));
+            }
+            return emptyMap();
         }
 
         @Override
