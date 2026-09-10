@@ -1,6 +1,7 @@
 package com.dat3m.dartagnan.wmm;
 
 import com.dat3m.dartagnan.metadata.MetadataCarrier;
+import com.dat3m.dartagnan.task.verification.AxiomRefinementSolver;
 import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
 import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.axiom.Emptiness;
@@ -35,6 +36,7 @@ public interface Constraint extends MetadataCarrier<Constraint> {
         default T visitAxiom(Axiom axiom) { return visitConstraint(axiom); }
         default T visitEmptiness(Emptiness axiom) { return visitAxiom(axiom); }
         default T visitIrreflexivity(Irreflexivity axiom) { return visitAxiom(axiom); }
+        default T visitEazyIrreflexivity(AxiomRefinementSolver.EazyIrreflexivity axiom) { return visitIrreflexivity(axiom); }
         default T visitAcyclicity(Acyclicity axiom) { return visitAxiom(axiom); }
 
         // -------------------------- Misc --------------------------

@@ -5,6 +5,7 @@ import com.dat3m.dartagnan.solver.caat.predicates.CAATPredicate;
 import com.dat3m.dartagnan.solver.caat.predicates.Derivable;
 import com.dat3m.dartagnan.solver.caat.predicates.relationGraphs.Edge;
 import com.dat3m.dartagnan.solver.caat.predicates.relationGraphs.RelationGraph;
+import com.dat3m.dartagnan.solver.caat4wmm.ViolationPattern;
 import com.google.common.base.Preconditions;
 
 import java.util.ArrayList;
@@ -17,9 +18,15 @@ public class IrreflexivityConstraint extends AbstractConstraint {
 
     private final RelationGraph constrainedGraph;
     private final List<Edge> violatingEdges = new ArrayList<>();
+    private ViolationPattern pattern;
 
     public IrreflexivityConstraint(RelationGraph constrainedGraph) {
        this.constrainedGraph = constrainedGraph;
+    }
+
+    public IrreflexivityConstraint(RelationGraph constrainedGraph, ViolationPattern pattern) {
+        this.constrainedGraph = constrainedGraph;
+        this.pattern = pattern;
     }
 
     @Override
@@ -60,4 +67,35 @@ public class IrreflexivityConstraint extends AbstractConstraint {
         violatingEdges.removeIf(e -> e.getTime() > time);
     }
 
+    public Collection<List<GraphEdge>> getCyclicViolations() {
+        final Collection<List<GraphEdge>> cycles = new ArrayList<>();
+        final List<ViolationPattern.Edge> patternEdges = pattern.getEdges();
+        for (final Edge violatingEdge : violatingEdges) {
+            for (final ViolationPattern.Match cycle : pattern.findMatches(violatingEdge.getFirst(), violatingEdge.getSecond())) {
+                final List<GraphEdge> edges = new ArrayList<>();
+                final int[] cycleEventIds = cycle.toArray();
+                for (final ViolationPattern.Edge edge : patternEdges) {
+                    final int source = cycleEventIds[edge.from().id()];
+                    final int target = cycleEventIds[edge.to().id()];
+                    final RelationGraph graph = edge.graph();
+                    edges.add(new GraphEdge(graph.getById(source, target), graph));
+                }
+                cycles.add(edges);
+            }
+        }
+        return cycles;
+    }
+
+    public static class GraphEdge extends Edge {
+        private final RelationGraph graph;
+
+        private GraphEdge(Edge edge, RelationGraph graph) {
+            super(edge.getFirst(), edge.getSecond(), edge.getTime(), edge.getDerivationLength());
+            this.graph = graph;
+        }
+
+        public RelationGraph getGraph() {
+            return graph;
+        }
+    }
 }

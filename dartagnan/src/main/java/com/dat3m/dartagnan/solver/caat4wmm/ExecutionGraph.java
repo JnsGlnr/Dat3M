@@ -17,6 +17,7 @@ import com.dat3m.dartagnan.solver.caat.predicates.sets.derived.UnionSet;
 import com.dat3m.dartagnan.solver.caat4wmm.basePredicates.*;
 import com.dat3m.dartagnan.utils.dependable.DependencyGraph;
 import com.dat3m.dartagnan.model.ExecutionModel;
+import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.Wmm;
 import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
@@ -43,7 +44,7 @@ public class ExecutionGraph {
 
     private final Wmm memoryModel;
     private final Predicate<? super com.dat3m.dartagnan.wmm.Constraint> encodedConstraints;
-    private final Predicate<? super Axiom> activeAxioms;
+    private final Predicate<? super Axiom> eazyAxioms;
     private final BiMap<Relation, CAATPredicate> predicateToRelationMap = HashBiMap.create();
     private final BiMap<Axiom, Constraint> constraintMap = HashBiMap.create();
 
@@ -54,10 +55,10 @@ public class ExecutionGraph {
 
     // ============= Construction & Init ===============
 
-    public ExecutionGraph(Wmm model, Predicate<? super com.dat3m.dartagnan.wmm.Constraint> encoded, Predicate<? super Axiom> active) {
+    public ExecutionGraph(Wmm model, Predicate<? super com.dat3m.dartagnan.wmm.Constraint> encoded, Predicate<? super Axiom> eazy) {
         memoryModel = Preconditions.checkNotNull(model);
         encodedConstraints = Preconditions.checkNotNull(encoded);
-        activeAxioms = Preconditions.checkNotNull(active);
+        eazyAxioms = Preconditions.checkNotNull(eazy);
         constructMappings();
     }
 
@@ -175,32 +176,37 @@ public class ExecutionGraph {
             return Collections.singletonList(constraintMap.get(axiom));
         }
 
-        final List<Constraint> constraints = new ArrayList<>(2);
+        final List<Constraint> constraints = new ArrayList<>();
         final Relation inner = axiom.getRelation();
         final CAATPredicate innerPred = inner.isSet() ?
             getOrCreateSetFromRelation(inner) :
             getOrCreateGraphFromRelation(inner);
-        Constraint constraint = switch (axiom) {
+        final Constraint constraint = switch (axiom) {
             case Acyclicity _ -> {
-                if (activeAxioms.test(axiom)) {
-                    constraints.add(new EmptinessConstraint(new DifferenceGraph((RelationGraph) innerPred, new MayGraph(inner))));
-                    yield new AcyclicityConstraint(new IntersectionGraph((RelationGraph) innerPred, new ActiveGraph(axiom)));
+                if (eazyAxioms.test(axiom)) {
+                    constraints.add(getMayConstraint((RelationGraph) innerPred, inner));
+                    yield new AcyclicityConstraint(getEncodeGraph((RelationGraph) innerPred, axiom));
                 } else {
                     yield new AcyclicityConstraint((RelationGraph) innerPred);
                 }
             }
             case Emptiness _ -> {
-                if (innerPred instanceof RelationGraph innerGraph && activeAxioms.test(axiom)) {
-                    constraints.add(new EmptinessConstraint(new DifferenceGraph(innerGraph, new MayGraph(inner))));
-                    yield new EmptinessConstraint(new IntersectionGraph(innerGraph, new ActiveGraph(axiom)));
+                if (innerPred instanceof RelationGraph innerGraph && eazyAxioms.test(axiom)) {
+                    constraints.add(getMayConstraint(innerGraph, inner));
+                    yield new EmptinessConstraint(getEncodeGraph(innerGraph, axiom));
                 } else {
                     yield new EmptinessConstraint(innerPred);
                 }
             }
-            case Irreflexivity _ -> {
-                if (activeAxioms.test(axiom)) {
-                    constraints.add(new EmptinessConstraint(new DifferenceGraph((RelationGraph) innerPred, new MayGraph(inner))));
-                    yield new IrreflexivityConstraint(new IntersectionGraph((RelationGraph) innerPred, new ActiveGraph(axiom)));
+            case Irreflexivity irreflexivity -> {
+                if (eazyAxioms.test(axiom)) {
+                    for (final Definition definition : irreflexivity.getComponents()) {
+                        final Relation compositionRel = definition.getDefinedRelation();
+                        final RelationGraph compositionPred = (RelationGraph) predicateToRelationMap.get(compositionRel);
+                        constraints.add(getMayConstraint(compositionPred, compositionRel));
+                    }
+                    yield new IrreflexivityConstraint((RelationGraph) innerPred,
+                            ViolationPattern.ofRelation(inner, predicateToRelationMap, true));
                 } else {
                     yield new IrreflexivityConstraint((RelationGraph) innerPred);
                 }
@@ -211,6 +217,20 @@ public class ExecutionGraph {
         constraints.add(constraint);
         constraintMap.put(axiom, constraint);
         return constraints;
+    }
+
+    private RelationGraph getEncodeGraph(final RelationGraph inner, final com.dat3m.dartagnan.wmm.Constraint constraint) {
+        final RelationGraph staticEncodeGraph = new EncodeGraph(constraint);
+        final RelationGraph encodeGraph = new IntersectionGraph(inner, staticEncodeGraph);
+        encodeGraph.setName(staticEncodeGraph.getName() + " " + inner.getName());
+        return encodeGraph;
+    }
+
+    private Constraint getMayConstraint(final RelationGraph inner, final Relation relation) {
+        final RelationGraph staticMayGraph = new MayGraph(relation);
+        final RelationGraph mayGraph = new DifferenceGraph(inner, staticMayGraph);
+        mayGraph.setName(staticMayGraph.getName() + " " + inner.getName());
+        return new EmptinessConstraint(mayGraph);
     }
 
     private RelationGraph getOrCreateGraphFromRelation(Relation rel) {

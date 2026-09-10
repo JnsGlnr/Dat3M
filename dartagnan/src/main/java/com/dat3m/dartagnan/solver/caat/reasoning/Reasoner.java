@@ -2,6 +2,7 @@ package com.dat3m.dartagnan.solver.caat.reasoning;
 
 import com.dat3m.dartagnan.solver.caat.constraints.AcyclicityConstraint;
 import com.dat3m.dartagnan.solver.caat.constraints.Constraint;
+import com.dat3m.dartagnan.solver.caat.constraints.IrreflexivityConstraint;
 import com.dat3m.dartagnan.solver.caat.misc.EdgeDirection;
 import com.dat3m.dartagnan.solver.caat.predicates.CAATPredicate;
 import com.dat3m.dartagnan.solver.caat.predicates.Derivable;
@@ -12,7 +13,7 @@ import com.dat3m.dartagnan.solver.caat.predicates.relationGraphs.derived.Interse
 import com.dat3m.dartagnan.solver.caat.predicates.sets.derived.ProjectionSet;
 import com.dat3m.dartagnan.solver.caat.predicates.sets.Element;
 import com.dat3m.dartagnan.solver.caat.predicates.sets.SetPredicate;
-import com.dat3m.dartagnan.solver.caat4wmm.basePredicates.ActiveGraph;
+import com.dat3m.dartagnan.solver.caat4wmm.basePredicates.EncodeGraph;
 import com.dat3m.dartagnan.solver.caat4wmm.basePredicates.MayGraph;
 import com.dat3m.dartagnan.utils.logic.Conjunction;
 import com.dat3m.dartagnan.utils.logic.DNF;
@@ -75,14 +76,15 @@ public class Reasoner {
         CAATPredicate pred = constraint.getConstrainedPredicate();
         if (pred instanceof IntersectionGraph intersection) {
             List<RelationGraph> dependencies = intersection.getDependencies();
-            if (dependencies.size() == 2 && dependencies.get(1) instanceof ActiveGraph) {
+            if (dependencies.size() == 2 && dependencies.get(1) instanceof EncodeGraph) {
                 pred = dependencies.get(0);
             }
         }
-        Collection<? extends Collection<? extends Derivable>> violations = constraint.getViolations();
+        Collection<? extends Collection<? extends Derivable>> violations =
+                constraint instanceof IrreflexivityConstraint irreflexivity ? irreflexivity.getCyclicViolations() : constraint.getViolations();
         List<CAATImplication> reasonList = new ArrayList<>();
 
-        if (constraint instanceof AcyclicityConstraint) {
+        if (constraint instanceof AcyclicityConstraint || constraint instanceof IrreflexivityConstraint) {
             // For acyclicity constraints, it is likely that we encounter the same
             // edge multiple times (as it can be part of different cycles)
             // so we memoize the computed reasons and reuse them if possible.
@@ -92,9 +94,11 @@ public class Reasoner {
 
             for (Collection<Edge> violation : (Collection<Collection<Edge>>)violations) {
                 for (Edge edge : violation) {
+                    final RelationGraph graph = edge instanceof final IrreflexivityConstraint.GraphEdge graphEdge ?
+                            graphEdge.getGraph() : constrainedGraph;
                     reasonMap.computeIfAbsent(edge, key -> {
-                        final CAATImplication implication = new CAATImplication(computeReason(constrainedGraph, key),
-                                new EdgeLiteral(constrainedGraph, key, true));
+                        final CAATImplication implication = new CAATImplication(computeReason(graph, key),
+                                new EdgeLiteral(graph, key, true));
                         reasonList.add(implication);
                         return implication;
                     });
