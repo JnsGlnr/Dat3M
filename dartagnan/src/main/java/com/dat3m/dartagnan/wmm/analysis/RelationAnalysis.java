@@ -9,6 +9,11 @@ import com.dat3m.dartagnan.verification.Context;
 import com.dat3m.dartagnan.verification.Task;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.Wmm;
+import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
+import com.dat3m.dartagnan.wmm.axiom.Axiom;
+import com.dat3m.dartagnan.wmm.axiom.Emptiness;
+import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
+import com.dat3m.dartagnan.wmm.utils.Tuple;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +84,7 @@ public interface RelationAnalysis {
             summary.append("\t#Relations: ").append(wmm.getRelations().size()).append("\n");
             summary.append("\t#Axioms: ").append(wmm.getAxioms().size()).append("\n");
         }
+        a.removeUnusedAxioms(wmm);
         if (c.enableExtended) {
             long mayCount = -1;
             long mustCount = -1;
@@ -114,6 +120,19 @@ public interface RelationAnalysis {
         besides its definition, e.g., when we perform XRA.
      */
     void collectDiscrepancies(Set<Relation> relations, Map<Relation, List<EventGraph>> discrepancyCollector);
+
+    default void removeUnusedAxioms(final Wmm wmm) {
+        for (final Axiom axiom : wmm.getAxioms()) {
+            final EventGraph maySet = getKnowledge(axiom.getRelation()).getMaySet();
+            if (axiom instanceof Emptiness && maySet.isEmpty()) {
+                wmm.removeConstraint(axiom);
+            } else if (axiom instanceof Irreflexivity && maySet.filter(Tuple::isLoop).isEmpty()) {
+                wmm.removeConstraint(axiom);
+            } else if (axiom instanceof Acyclicity && computeTransitiveClosure(maySet).getMaySet().filter(Tuple::isLoop).isEmpty()) {
+                wmm.removeConstraint(axiom);
+            }
+        }
+    }
     
     private static long countMaySet(Wmm memoryModel, RelationAnalysis ra) {
         return memoryModel.getRelations().stream()
