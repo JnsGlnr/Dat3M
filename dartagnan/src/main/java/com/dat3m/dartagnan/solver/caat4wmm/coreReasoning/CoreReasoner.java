@@ -166,23 +166,20 @@ public class CoreReasoner {
             return Collections.emptySet();
         }
 
-        // If the implied literal is not relevant for its axioms, we can skip computing implications for it.
+        // If the implied literal is neither relevant for its axioms nor active, we can skip computing implications for it.
+        boolean hasAxiom = false;
         boolean irrelevant = true;
         for (final Axiom axiom : executionGraph.getAxiomConstraintMap().keySet()) {
             if (axiom.getRelation().equals(impliedRelation)) {
-                final EventGraph relevantSet = asa.getRelevantSet(axiom);
-                if (impliedCoreLit instanceof RelLiteral impliedRelLiteral) {
-                    if (relevantSet.contains(impliedRelLiteral.getSource(), impliedRelLiteral.getTarget())) {
-                        irrelevant = false;
-                    }
-                } else if (impliedCoreLit instanceof ExecLiteral impliedExecLiteral) {
-                    if (relevantSet.contains(impliedExecLiteral.getEvent(), impliedExecLiteral.getEvent())) {
-                        irrelevant = false;
-                    }
-                } else {
+                hasAxiom = true;
+                if (containsCoreLiteral(asa.getRelevantSet(axiom), impliedCoreLit)) {
                     irrelevant = false;
+                    break;
                 }
             }
+        }
+        if (!hasAxiom) {
+            irrelevant = !containsCoreLiteral(asa.getActiveSet(impliedRelation.getDefinition()), impliedCoreLit);
         }
         if (irrelevant) {
             return Collections.emptySet();
@@ -247,6 +244,16 @@ public class CoreReasoner {
             }
         }
         return result;
+    }
+
+    private static boolean containsCoreLiteral(final EventGraph set, final CoreLiteral literal) {
+        if (literal instanceof RelLiteral impliedRelLiteral) {
+            return set.contains(impliedRelLiteral.getSource(), impliedRelLiteral.getTarget());
+        } else if (literal instanceof ExecLiteral impliedExecLiteral) {
+            return set.contains(impliedExecLiteral.getEvent(), impliedExecLiteral.getEvent());
+        } else {
+            throw new IllegalStateException("Unexpected core literal type " + literal.getClass().getSimpleName());
+        }
     }
 
     private Conjunction<CoreLiteral> toCoreReasonNoSymmetry(Conjunction<CAATLiteral> baseReason) {

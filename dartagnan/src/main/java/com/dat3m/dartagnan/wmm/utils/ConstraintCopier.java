@@ -1,5 +1,6 @@
 package com.dat3m.dartagnan.wmm.utils;
 
+import com.dat3m.dartagnan.verification.solving.AxiomRefinementSolver;
 import com.dat3m.dartagnan.wmm.Assumption;
 import com.dat3m.dartagnan.wmm.Constraint;
 import com.dat3m.dartagnan.wmm.Definition;
@@ -47,6 +48,11 @@ public final class ConstraintCopier implements Constraint.Visitor<Constraint> {
     @Override
     public Irreflexivity visitIrreflexivity(Irreflexivity axiom) {
         return copyName(axiom, new Irreflexivity(translate(axiom.getRelation()), axiom.isNegated(), axiom.isFlagged()));
+    }
+
+    @Override
+    public Irreflexivity visitEazyIrreflexivity(AxiomRefinementSolver.EazyIrreflexivity axiom) {
+        return copyName(axiom, new AxiomRefinementSolver.EazyIrreflexivity(new Irreflexivity(translate(axiom.getRelation()), axiom.isNegated(), axiom.isFlagged())));
     }
 
     @Override
