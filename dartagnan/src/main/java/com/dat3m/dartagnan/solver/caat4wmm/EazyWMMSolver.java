@@ -4,13 +4,15 @@ package com.dat3m.dartagnan.solver.caat4wmm;
 import com.dat3m.dartagnan.encoding.EncodingContext;
 import com.dat3m.dartagnan.encoding.IREvaluator;
 import com.dat3m.dartagnan.solver.caat.CAATSolver;
-import com.dat3m.dartagnan.solver.caat.constraints.AcyclicityConstraint;
 import com.dat3m.dartagnan.solver.caat.constraints.Constraint;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreImplication;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreLiteral;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.TrivialImplications;
 import com.dat3m.dartagnan.utils.logic.Conjunction;
 import com.dat3m.dartagnan.utils.logic.DNF;
+import com.dat3m.dartagnan.wmm.axiom.Axiom;
+import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
+import com.dat3m.dartagnan.wmm.definition.Composition;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
 
 import java.util.*;
@@ -20,20 +22,37 @@ import java.util.*;
 */
 public class EazyWMMSolver extends WMMSolver {
 
+    private final Collection<com.dat3m.dartagnan.wmm.Constraint> eazyConstraints;
     private final TrivialImplications trivialImplications;
     private final boolean computeCoreReasons;
 
-    private EazyWMMSolver(EncodingContext c, TrivialImplications trivialImplications, boolean computeCoreReasons)
+    private EazyWMMSolver(EncodingContext c, Collection<com.dat3m.dartagnan.wmm.Constraint> eazyConstraints,
+                          TrivialImplications trivialImplications, boolean computeCoreReasons)
             throws InvalidConfigurationException {
-        super(c, new ExecutionGraph(c.getTask().getMemoryModel(), constraint -> c.isEncoded(constraint) && !trivialImplications.isEazy(constraint),
-                trivialImplications::isEazy));
+        super(c, new ExecutionGraph(c.getTask().getMemoryModel(), constraint -> c.isEncoded(constraint) && !isEazy(constraint, eazyConstraints),
+                eazyConstraints::contains));
+        this.eazyConstraints = eazyConstraints;
         this.trivialImplications = trivialImplications;
         this.computeCoreReasons = computeCoreReasons;
     }
 
-    public static EazyWMMSolver withContext(EncodingContext context, TrivialImplications trivialImplications, boolean computeCoreReasons)
+    private static boolean isEazy(final com.dat3m.dartagnan.wmm.Constraint constraint, final Collection<com.dat3m.dartagnan.wmm.Constraint> eazyConstraints) {
+        if (eazyConstraints.contains(constraint)) {
+            return true;
+        }
+        for (final com.dat3m.dartagnan.wmm.Constraint eazyConstraint : eazyConstraints) {
+            if (constraint instanceof Composition comp && eazyConstraint instanceof final Irreflexivity irreflexivity
+                    && irreflexivity.collectCompositions().contains(comp)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static EazyWMMSolver withContext(EncodingContext context, Collection<com.dat3m.dartagnan.wmm.Constraint> eazyConstraints,
+                                            TrivialImplications trivialImplications, boolean computeCoreReasons)
             throws InvalidConfigurationException {
-        return new EazyWMMSolver(context, trivialImplications, computeCoreReasons);
+        return new EazyWMMSolver(context, eazyConstraints, trivialImplications, computeCoreReasons);
     }
 
     public Result check(IREvaluator model) {
@@ -54,9 +73,10 @@ public class EazyWMMSolver extends WMMSolver {
             final List<Constraint> eazyConstraints = new ArrayList<>();
             final List<Constraint> lazyConstraints = new ArrayList<>();
             for (Constraint violatedConstraint : caatResult.getViolatedConstraints()) {
-                if (violatedConstraint instanceof AcyclicityConstraint) {
+                final Axiom axiom = executionGraph.getAxiomConstraintMap().inverse().get(violatedConstraint);
+                if (this.eazyConstraints.contains(axiom)) {
                     eazyConstraints.add(violatedConstraint);
-                } else if (computeCoreReasons) {
+                } else if (computeCoreReasons || !executionModel.getMemoryModel().getAxioms().contains(axiom)) {
                     lazyConstraints.add(violatedConstraint);
                 }
             }
@@ -67,17 +87,13 @@ public class EazyWMMSolver extends WMMSolver {
             stats.numComputedCoreImplications = result.coreImplications.getSize();
             stats.coreImplicationComputationTime = System.currentTimeMillis() - curTime;
 
-            if (computeCoreReasons) {
-                // ============== Compute Core reasons ==============
-                curTime = System.currentTimeMillis();
-                Set<Conjunction<CoreLiteral>> coreReasons = reasoner.toCoreReasons(solver.computeInconsistencyReasons(lazyConstraints));
-                stats.numComputedCoreReasons = coreReasons.size();
-                result.coreReasons = new DNF<>(coreReasons);
-                stats.numComputedReducedCoreReasons = result.coreReasons.getNumberOfCubes();
-                stats.coreReasonComputationTime = System.currentTimeMillis() - curTime;
-            } else {
-                result.coreReasons = DNF.FALSE();
-            }
+            // ============== Compute Core reasons ==============
+            curTime = System.currentTimeMillis();
+            Set<Conjunction<CoreLiteral>> coreReasons = reasoner.toCoreReasons(solver.computeInconsistencyReasons(lazyConstraints));
+            stats.numComputedCoreReasons = coreReasons.size();
+            result.coreReasons = new DNF<>(coreReasons);
+            stats.numComputedReducedCoreReasons = result.coreReasons.getNumberOfCubes();
+            stats.coreReasonComputationTime = System.currentTimeMillis() - curTime;
         }
 
         return result;

@@ -49,7 +49,7 @@ public class Edge extends AbstractDerivable implements Comparable<Edge> {
     public boolean equals(Object obj) {
         if (this == obj) {
             return true;
-        } else if (obj == null || getClass() != obj.getClass()) {
+        } else if (!(obj instanceof Edge)) {
             return false;
         }
         return equals((Edge)obj);
