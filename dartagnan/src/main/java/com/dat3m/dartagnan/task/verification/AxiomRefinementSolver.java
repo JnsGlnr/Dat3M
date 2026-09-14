@@ -10,6 +10,7 @@ import com.dat3m.dartagnan.solver.caat4wmm.EazyRefiner;
 import com.dat3m.dartagnan.solver.caat4wmm.EazyWMMSolver;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreImplication;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreLiteral;
+import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.RelLiteral;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.TrivialImplications;
 import com.dat3m.dartagnan.utils.logic.Conjunction;
 import com.dat3m.dartagnan.utils.logic.DNF;
@@ -473,7 +474,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
     private TrivialImplications getTrivialImplications(Collection<? extends Constraint> eazyConstraints) {
         final RelationAnalysis ra = context.getAnalysisContext().requires(RelationAnalysis.class);
         final ActiveSetAnalysis asa = context.getAnalysisContext().requires(ActiveSetAnalysis.class);
-        final Map<Relation, Map<Relation, Map<Event, List<Event>>>> result = new LinkedHashMap<>();
+        final Map<Relation, Map<Relation, Map<RelLiteral, List<RelLiteral>>>> result = new LinkedHashMap<>();
         for (Constraint eazyConstraint : eazyConstraints) {
             for (final Definition eazyDef : getEazyDefinitions(eazyConstraint)) {
                 final Relation eazyRel = eazyDef.getDefinedRelation();
@@ -505,9 +506,9 @@ public class AxiomRefinementSolver extends RefinementSolver {
         }
     }
 
-    private Map<Relation, Map<Event, List<Event>>> getTrivialImplications(final Relation eazyRel, final RelationAnalysis ra, final EventGraph encodeSet) {
+    private Map<Relation, Map<RelLiteral, List<RelLiteral>>> getTrivialImplications(final Relation eazyRel, final RelationAnalysis ra, final EventGraph encodeSet) {
         final Set<Definition> visited = new HashSet<>();
-        final Map<Relation, Map<Event, List<Event>>> trivialImplications = new LinkedHashMap<>();
+        final Map<Relation, Map<RelLiteral, List<RelLiteral>>> trivialImplications = new LinkedHashMap<>();
         final EventGraph must = ra.getKnowledge(eazyRel).getMustSet();
 
         final List<Definition> foundDefs = new ArrayList<>();
@@ -531,7 +532,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
                                 events.computeIfAbsent(e1, k -> new ArrayList<>()).add(e2);
                             }
                         });
-                        trivialImplications.put(rel, events);
+                        trivialImplications.put(rel, TrivialImplications.simpleImplications(rel, eazyRel, events));
                         foundDefs.add(definition);
                     }
                 } else if (definition instanceof Union || definition instanceof SetIdentity
