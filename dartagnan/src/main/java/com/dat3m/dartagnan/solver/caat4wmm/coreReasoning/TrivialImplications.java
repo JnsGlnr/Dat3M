@@ -33,12 +33,7 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<Event, List<Ev
     }
 
     public boolean isTrivial(Relation reasonRel, Relation impliedRel, Event event) {
-        final Map<Event, List<Event>> trivialImplicationsForDefAndRel =
-                getTrivialImplicationForDefAndRel(impliedRel, reasonRel);
-        if (trivialImplicationsForDefAndRel == null) {
-            return false;
-        }
-        return trivialImplicationsForDefAndRel.containsKey(event);
+        return isTrivial(reasonRel, impliedRel, event, event);
     }
 
     public boolean isTrivial(Relation reasonRel, Relation impliedRel, Event first, Event second) {
