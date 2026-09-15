@@ -16,6 +16,7 @@ import com.dat3m.dartagnan.smt.FormulaManagerExt;
 import com.dat3m.dartagnan.utils.dependable.DependencyGraph;
 import com.dat3m.dartagnan.verification.Context;
 import com.dat3m.dartagnan.verification.Task;
+import com.dat3m.dartagnan.verification.solving.AxiomRefinementSolver;
 import com.dat3m.dartagnan.wmm.Constraint;
 import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
@@ -92,11 +93,16 @@ public final class EncodingContext {
         final Iterable<? extends Constraint> toEncode = Iterables.concat(c, anarchicConstraints);
         var depGraph = DependencyGraph.from(toEncode, Wmm::computeConstraintDependencies);
         // NOTE: This guarantees a deterministic ordering of the constraints to be encoded
-        constraintsToEncode = t.getMemoryModel().getConstraints().stream()
-                .filter(depGraph::contains)
-                .map(depGraph::get)
-                .map(DependencyGraph.Node::getContent)
-                .toList();
+        constraintsToEncode = new LinkedHashSet<>();
+        for (final Constraint constraint : t.getMemoryModel().getConstraints()) {
+            if (depGraph.contains(constraint)) {
+                final Constraint depGraphConstraint = depGraph.get(constraint).getContent();
+                if (depGraphConstraint instanceof final AxiomRefinementSolver.EazyIrreflexivity eazyIrreflexivity) {
+                    constraintsToEncode.addAll(eazyIrreflexivity.collectCompositions());
+                }
+                constraintsToEncode.add(depGraph.get(constraint).getContent());
+            }
+        }
     }
 
     public static EncodingContext of(Task task, Context analysisContext, FormulaManager formulaManager) throws InvalidConfigurationException {

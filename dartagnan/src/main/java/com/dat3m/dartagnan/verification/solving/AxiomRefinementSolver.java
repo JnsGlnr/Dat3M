@@ -523,9 +523,9 @@ public class AxiomRefinementSolver extends RefinementSolver {
             final DefinitionWithConditions constraintWithConditions = visitingStack.pop();
             final Definition definition = constraintWithConditions.definition;
             if (visited.add(definition)) {
-                if (context.isEncoded(definition)) {
+                final Relation rel = definition.getDefinedRelation();
+                if (rel != eazyRel && context.isEncoded(definition)) {
                     if (!foundDefs.contains(definition)) {
-                        final Relation rel = definition.getDefinedRelation();
                         final Map<Event, List<Event>> events = new LinkedHashMap<>();
                         ra.getKnowledge(rel).getMaySet().apply((e1, e2) -> {
                             if (!must.contains(e1, e2) && encodeSet.contains(e1, e2)) {
@@ -691,11 +691,6 @@ public class AxiomRefinementSolver extends RefinementSolver {
         @Override
         public List<? extends Relation> getConstrainedRelations() {
             return Collections.emptyList();
-        }
-
-        @Override
-        public <T> T accept(Visitor<? extends T> visitor) {
-            return visitor.visitEazyIrreflexivity(this);
         }
     }
 }
