@@ -50,7 +50,7 @@ public class Conjunction<T extends Literal<T>> implements PartialOrder<Conjuncti
     }
 
     public Conjunction(Collection<T> literals) {
-        this(new HashSet<>(literals), true);
+        this(new LinkedHashSet<>(literals), true);
     }
 
     protected Conjunction(HashSet<T> literals, boolean reduce) {
@@ -142,7 +142,7 @@ public class Conjunction<T extends Literal<T>> implements PartialOrder<Conjuncti
             return other;
         }
 
-        HashSet<T> result = new HashSet<>(this.getSize() + other.getSize());
+        HashSet<T> result = new LinkedHashSet<>(this.getSize() + other.getSize());
         result.addAll(this.getLiterals());
         result.addAll(other.getLiterals());
 
@@ -153,7 +153,7 @@ public class Conjunction<T extends Literal<T>> implements PartialOrder<Conjuncti
         if (this.isFalse() || this.isTrue()) {
             return this;
         }
-        HashSet<T> result = new HashSet<>(this.getSize());
+        HashSet<T> result = new LinkedHashSet<>(this.getSize());
         literals.stream().filter(Predicate.not(pred)).forEach(result::add);
         return new Conjunction<>(result, false);
     }

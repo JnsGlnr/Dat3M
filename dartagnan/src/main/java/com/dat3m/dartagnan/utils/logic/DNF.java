@@ -66,7 +66,7 @@ public class DNF<T extends Literal<T>> implements PartialOrder<DNF<T>> {
     }
 
     public DNF(Collection<Conjunction<T>> reasons) {
-        this(new HashSet<>(reasons), true);
+        this(new LinkedHashSet<>(reasons), true);
     }
 
     protected DNF(Set<Conjunction<T>> reasons) {
@@ -209,7 +209,7 @@ public class DNF<T extends Literal<T>> implements PartialOrder<DNF<T>> {
             return this;
         }
 
-        Set<Conjunction<T>> result = new HashSet<>(this.reasons);
+        Set<Conjunction<T>> result = new LinkedHashSet<>(this.reasons);
         result.removeAll(reasons);
         return new DNF<>(result, false);
 
@@ -225,7 +225,7 @@ public class DNF<T extends Literal<T>> implements PartialOrder<DNF<T>> {
             return this;
         }
 
-        HashSet<Conjunction<T>> result = new HashSet<>(this.reasons);
+        HashSet<Conjunction<T>> result = new LinkedHashSet<>(this.reasons);
         result.addAll(other.reasons);
         return new DNF<>(result);
     }
@@ -239,7 +239,7 @@ public class DNF<T extends Literal<T>> implements PartialOrder<DNF<T>> {
             return this;
         }
 
-        HashSet<Conjunction<T>> result = new HashSet<>(this.getNumberOfCubes() * other.getNumberOfCubes());
+        HashSet<Conjunction<T>> result = new LinkedHashSet<>(this.getNumberOfCubes() * other.getNumberOfCubes());
         for (Conjunction<T> cube1 : this.reasons) {
             for (Conjunction<T> cube2 : other.reasons) {
                 result.add(cube1.and(cube2));

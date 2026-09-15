@@ -55,8 +55,6 @@ import static com.dat3m.dartagnan.verification.ResultStatus.*;
 import static com.dat3m.dartagnan.utils.Utils.toTimeString;
 import static java.util.Collections.singleton;
 import static java.util.function.Predicate.not;
-import static java.util.function.UnaryOperator.identity;
-import static java.util.stream.Collectors.toMap;
 
 /*
     Axiom refinement is a custom solving procedure that starts with free memory model axioms and iteratively refines
@@ -425,25 +423,22 @@ public class AxiomRefinementSolver extends RefinementSolver {
     }
 
     private Map<Constraint, Constraint> getConstraintsToEazyConstraints(Collection<Axiom> axioms, Collection<Constraint> wmmConstraintsToEncode) {
-        final Map<Constraint, Constraint> acyclicity = axioms.stream()
+        final Map<Constraint, Constraint> constraintsToEazyConstraints = new LinkedHashMap<>();
+        axioms.stream()
                 .filter(Acyclicity.class::isInstance)
                 .filter(not(wmmConstraintsToEncode::contains))
-                .collect(toMap(identity(), a -> new Acyclicity(a.getRelation(), a.isNegated(), a.isFlagged()) {
+                .forEach(a -> constraintsToEazyConstraints.put(a, new Acyclicity(a.getRelation(), a.isNegated(), a.isFlagged()) {
                     @Override
                     public List<? extends Relation> getConstrainedRelations() {
                         return Collections.emptyList();
                     }
                 }));
-
-        final Map<Constraint, Constraint> irreflexivity = axioms.stream()
+        axioms.stream()
                 .filter(Irreflexivity.class::isInstance)
                 .map(Irreflexivity.class::cast)
                 .filter(not(wmmConstraintsToEncode::contains))
                 .filter(a -> a.getComponents().size() > 1)
-                .collect(toMap(identity(), EazyIrreflexivity::new));
-
-        final Map<Constraint, Constraint> constraintsToEazyConstraints = new HashMap<>(acyclicity);
-        constraintsToEazyConstraints.putAll(irreflexivity);
+                .forEach(a -> constraintsToEazyConstraints.put(a, new EazyIrreflexivity(a)));
         return constraintsToEazyConstraints;
     }
 
@@ -483,7 +478,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
     private TrivialImplications getTrivialImplications(Collection<? extends Constraint> eazyConstraints) {
         final RelationAnalysis ra = context.getAnalysisContext().requires(RelationAnalysis.class);
         final ActiveSetAnalysis asa = context.getAnalysisContext().requires(ActiveSetAnalysis.class);
-        final Map<Relation, Map<Relation, Map<Event, List<Event>>>> result = new HashMap<>();
+        final Map<Relation, Map<Relation, Map<Event, List<Event>>>> result = new LinkedHashMap<>();
         for (Constraint eazyConstraint : eazyConstraints) {
             for (final Definition eazyDef : getEazyDefinitions(eazyConstraint)) {
                 final Relation eazyRel = eazyDef.getDefinedRelation();
@@ -517,7 +512,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
 
     private Map<Relation, Map<Event, List<Event>>> getTrivialImplications(final Relation eazyRel, final RelationAnalysis ra, final EventGraph encodeSet) {
         final Set<Definition> visited = new HashSet<>();
-        final Map<Relation, Map<Event, List<Event>>> trivialImplications = new HashMap<>();
+        final Map<Relation, Map<Event, List<Event>>> trivialImplications = new LinkedHashMap<>();
         final EventGraph must = ra.getKnowledge(eazyRel).getMustSet();
 
         final List<Definition> foundDefs = new ArrayList<>();
@@ -530,7 +525,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
                 if (context.isEncoded(definition)) {
                     if (!foundDefs.contains(definition)) {
                         final Relation rel = definition.getDefinedRelation();
-                        final Map<Event, List<Event>> events = new HashMap<>();
+                        final Map<Event, List<Event>> events = new LinkedHashMap<>();
                         ra.getKnowledge(rel).getMaySet().apply((e1, e2) -> {
                             if (!must.contains(e1, e2) && encodeSet.contains(e1, e2)) {
                                 for (EventGraph sideCondition : constraintWithConditions.sideConditions) {

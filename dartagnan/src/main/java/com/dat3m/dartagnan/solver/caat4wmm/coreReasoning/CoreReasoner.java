@@ -20,8 +20,6 @@ import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.definition.TagSet;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import org.sosy_lab.common.configuration.Option;
 import org.sosy_lab.common.configuration.Options;
 import org.sosy_lab.common.configuration.Configuration;
@@ -83,27 +81,26 @@ public class CoreReasoner {
     public Set<Conjunction<CoreLiteral>> toCoreReasons(DNF<CAATLiteral> baseReasons) {
 
         // (1) Reduce base reasons to simplified core reasons (without symmetry).
-        final BiMap<Conjunction<CAATLiteral>, Conjunction<CoreLiteral>> base2core =
-                HashBiMap.create(baseReasons.getNumberOfCubes());
+        final Map<Conjunction<CoreLiteral>, Conjunction<CAATLiteral>> core2Base = new LinkedHashMap<>(baseReasons.getNumberOfCubes() * 4 / 3);
         for (Conjunction<CAATLiteral> baseReason : baseReasons.getCubes()) {
             final Conjunction<CoreLiteral> coreReason = toCoreReasonNoSymmetry(baseReason);
-            if (!coreReason.isFalse() && !base2core.containsValue(coreReason)) {
+            if (!coreReason.isFalse() && !core2Base.containsKey(coreReason)) {
                 // NOTE: We only add productive base reasons whose core reasons are not FALSE.
-                base2core.put(baseReason, coreReason);
+                core2Base.put(coreReason, baseReason);
             }
         }
 
         // (2) Remove dominated core reasons and sort by reason length
-        final List<Conjunction<CoreLiteral>> reducedCoreReasons = new ArrayList<>(new DNF<>(base2core.values()).getCubes());
+        final List<Conjunction<CoreLiteral>> reducedCoreReasons = new ArrayList<>(new DNF<>(core2Base.keySet()).getCubes());
         reducedCoreReasons.sort(Comparator.comparingInt(Conjunction::getSize));
 
         // (3) Translate back to base reasons (we need the original base reasons for symmetry reasoning)
         final List<Conjunction<CAATLiteral>> reducedBaseReasons =
-                reducedCoreReasons.stream().map(base2core.inverse()::get).toList();
+                reducedCoreReasons.stream().map(core2Base::get).toList();
 
         // (4) Recompute core reasons with symmetry reasoning.
         //  Stop early, if the number of reasons exceeds a bound.
-        final Set<Conjunction<CoreLiteral>> coreReasons = new HashSet<>();
+        final Set<Conjunction<CoreLiteral>> coreReasons = new LinkedHashSet<>();
         for (Conjunction<CAATLiteral> baseReason : reducedBaseReasons) {
             coreReasons.addAll(toCoreReasons(baseReason));
             if (coreReasons.size() > MAX_NUM_COMPUTED_REASONS) {
@@ -121,7 +118,7 @@ public class CoreReasoner {
         // We use a standard worklist algorithm to do so.
         // NOTE: We compute the orbit of an "unreduced" core reason, because
         // reductions we can apply to a core reason may not be sound for its symmetric counterparts.
-        final Set<List<CoreLiteral>> orbit = new HashSet<>();
+        final Set<List<CoreLiteral>> orbit = new LinkedHashSet<>();
         final Deque<List<CoreLiteral>> workqueue = new ArrayDeque<>();
         workqueue.add(toUnreducedCoreReason(baseReason, domain));
         while (!workqueue.isEmpty()) {
@@ -135,7 +132,7 @@ public class CoreReasoner {
         }
 
         // Now we can reduce all computed (symmetric) reasons.
-        return orbit.stream().map(this::reduce).filter(Objects::nonNull).map(Conjunction::new).collect(Collectors.toSet());
+        return orbit.stream().map(this::reduce).filter(Objects::nonNull).map(Conjunction::new).collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     public Conjunction<CoreImplication> toCoreImplications(Conjunction<CAATImplication> baseImplications,
@@ -209,7 +206,7 @@ public class CoreReasoner {
         // We use a standard worklist algorithm to do so.
         // NOTE: We compute the orbit of an "unreduced" core reason, because
         // reductions we can apply to a core reason may not be sound for its symmetric counterparts.
-        final Set<CoreImplicationInternal> orbit = new HashSet<>();
+        final Set<CoreImplicationInternal> orbit = new LinkedHashSet<>();
         final Deque<CoreImplicationInternal> workqueue = new ArrayDeque<>();
         workqueue.add(new CoreImplicationInternal(toUnreducedCoreReason(baseReason, domain), impliedCoreLit));
         while (!workqueue.isEmpty()) {
