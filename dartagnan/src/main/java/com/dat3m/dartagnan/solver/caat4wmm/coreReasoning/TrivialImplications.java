@@ -35,6 +35,9 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Li
     }
 
     public boolean isTrivial(Relation reasonRel, Relation impliedRel, Event first, Event second) {
+        if (reasonRel == impliedRel) {
+            return true;
+        }
         final Map<RelLiteral, List<RelLiteral>> trivialImplicationsForDefAndRel =
                 getTrivialImplicationForDefAndRel(impliedRel, reasonRel);
         if (trivialImplicationsForDefAndRel == null) {
