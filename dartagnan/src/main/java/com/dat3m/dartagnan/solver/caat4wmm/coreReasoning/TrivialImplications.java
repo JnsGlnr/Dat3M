@@ -2,11 +2,20 @@ package com.dat3m.dartagnan.solver.caat4wmm.coreReasoning;
 
 import com.dat3m.dartagnan.encoding.EncodingContext;
 import com.dat3m.dartagnan.program.event.Event;
+import com.dat3m.dartagnan.wmm.Constraint;
+import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
+import com.dat3m.dartagnan.wmm.Wmm;
+import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
+import com.dat3m.dartagnan.wmm.definition.*;
+import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 
 import java.util.*;
+
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonMap;
 
 public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, List<RelLiteral>>>> trivialImplications) {
 
@@ -58,16 +67,156 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Li
         return trivialImplicationsForDef.get(rel);
     }
 
-    public static Map<RelLiteral, List<RelLiteral>> simpleImplications(final Relation reasonRel, final Relation impliedRel, final Map<Event, List<Event>> events) {
-        final Map<RelLiteral, List<RelLiteral>> simpleImplications = new LinkedHashMap<>();
-        for (final Map.Entry<Event, List<Event>> edge : events.entrySet()) {
-            final Event first = edge.getKey();
-            for (final Event second : edge.getValue()) {
-                final RelLiteral reason = new RelLiteral(reasonRel, first, second, true);
-                final RelLiteral implied = new RelLiteral(impliedRel, first, second, true);
-                simpleImplications.computeIfAbsent(reason, k -> new ArrayList<>()).add(implied);
-            }
+    public static Map<Relation, Map<RelLiteral, List<RelLiteral>>> getTrivialImplications(
+            final EncodingContext context, final Relation eazyRel, final EventGraph encodeSet
+    ) {
+        final TrivialImplicationsVisitor visitor = new TrivialImplicationsVisitor(context, eazyRel, encodeSet);
+        return eazyRel.getDefinition().accept(visitor);
+    }
+
+    private static class TrivialImplicationsVisitor implements Constraint.Visitor<Map<Relation, Map<RelLiteral, List<RelLiteral>>>> {
+
+        private final EncodingContext context;
+        private final RelationAnalysis ra;
+        private final Relation eazyRel;
+        private final Set<Definition> visited;
+
+        private Map<RelLiteral, List<RelLiteral>> implications;
+
+        private TrivialImplicationsVisitor(final EncodingContext context, final Relation eazyRel, final EventGraph encodeSet) {
+            this.context = context;
+            this.ra = context.getAnalysisContext().get(RelationAnalysis.class);
+            this.eazyRel = eazyRel;
+            this.visited = new HashSet<>();
+            this.implications = new LinkedHashMap<>();
+            final EventGraph mustSet = ra.getKnowledge(eazyRel).getMustSet();
+            encodeSet.apply((e1, e2) -> {
+                if (!mustSet.contains(e1, e2)) {
+                    final RelLiteral literal = new RelLiteral(eazyRel, e1, e2, true);
+                    implications.computeIfAbsent(literal, k -> new ArrayList<>()).add(literal);
+                }
+            });
+
+            visited.add(eazyRel.getDefinition());
         }
-        return simpleImplications;
+
+        private Map<Relation, Map<RelLiteral, List<RelLiteral>>> visit(final Definition definition, final Map<RelLiteral, List<RelLiteral>> implications) {
+            if (visited.add(definition)) {
+                final Relation rel = definition.getDefinedRelation();
+                if (rel != eazyRel && context.isEncoded(definition)) {
+                    return singletonMap(rel, implications);
+                }
+                final Map<RelLiteral, List<RelLiteral>> oldImplications = this.implications;
+                this.implications = implications;
+                final Map<Relation, Map<RelLiteral, List<RelLiteral>>> result = definition.accept(this);
+                this.implications = oldImplications;
+                return result;
+            }
+            return emptyMap();
+        }
+
+        @Override
+        public Map<Relation, Map<RelLiteral, List<RelLiteral>>> visitDefinition(final Definition definition) {
+            return emptyMap();
+        }
+
+        @Override
+        public Map<Relation, Map<RelLiteral, List<RelLiteral>>> visitUnion(final Union union) {
+            return visitSimple(union);
+        }
+
+        @Override
+        public Map<Relation, Map<RelLiteral, List<RelLiteral>>> visitIntersection(final Intersection intersection) {
+            final Map<Relation, Map<RelLiteral, List<RelLiteral>>> trivialImplications = new LinkedHashMap<>();
+            final Collection<Relation> operands = intersection.getOperands();
+            for (final Relation relation : operands) {
+                final Map<RelLiteral, List<RelLiteral>> curImplications = new LinkedHashMap<>();
+                final EventGraph maySet = ra.getKnowledge(relation).getMaySet();
+                for (final Map.Entry<RelLiteral, List<RelLiteral>> implicationsForReason : implications.entrySet()) {
+                    final RelLiteral reason = implicationsForReason.getKey();
+                    final Event first = reason.getSource();
+                    final Event second = reason.getTarget();
+                    if (maySet.contains(first, second)) {
+                        boolean otherConditionsHold = true;
+                        for (final Relation otherRelation : operands) {
+                            if (relation != otherRelation && !ra.getKnowledge(otherRelation).getMustSet().contains(first, second)) {
+                                otherConditionsHold = false;
+                                break;
+                            }
+                        }
+                        if (otherConditionsHold) {
+                            final RelLiteral newReason = new RelLiteral(relation, first, second, true);
+                            curImplications.put(newReason, implicationsForReason.getValue());
+                        }
+                    }
+                }
+                if (!curImplications.isEmpty()) {
+                    trivialImplications.putAll(visit(relation.getDefinition(), curImplications));
+                }
+            }
+            return trivialImplications;
+        }
+
+        @Override
+        public Map<Relation, Map<RelLiteral, List<RelLiteral>>> visitComposition(final Composition composition) {
+            final Map<Relation, Map<RelLiteral, List<RelLiteral>>> trivialImplications = new LinkedHashMap<>();
+            final Relation left = composition.getLeftOperand();
+            final Relation right = composition.getRightOperand();
+            for (final Relation relation : new Relation[] {left, right}) {
+                final boolean isLeft = relation == left;
+                final EventGraph otherMustOperands = ra.getKnowledge(isLeft ? right : left).getMustSet();
+                final Map<RelLiteral, List<RelLiteral>> curImplications = new LinkedHashMap<>();
+                final EventGraph maySet = ra.getKnowledge(relation).getMaySet();
+                for (final Map.Entry<RelLiteral, List<RelLiteral>> implicationsForReason : implications.entrySet()) {
+                    final RelLiteral reason = implicationsForReason.getKey();
+                    final Event first = reason.getSource();
+                    final Event second = reason.getTarget();
+                    if (maySet.contains(first, second)) {
+                        final Event commonEvent = isLeft ? second : first;
+                        if (otherMustOperands.contains(commonEvent, commonEvent)) {
+                            final RelLiteral newReason = new RelLiteral(relation, first, second, true);
+                            curImplications.put(newReason, implicationsForReason.getValue());
+                        }
+                    }
+                }
+                if (!curImplications.isEmpty()) {
+                    trivialImplications.putAll(visit(relation.getDefinition(), curImplications));
+                }
+            }
+            return trivialImplications;
+        }
+
+        @Override
+        public Map<Relation, Map<RelLiteral, List<RelLiteral>>> visitSetIdentity(final SetIdentity setIdentity) {
+            return visitSimple(setIdentity);
+        }
+
+        @Override
+        public Map<Relation, Map<RelLiteral, List<RelLiteral>>> visitTransitiveClosure(final TransitiveClosure transitive) {
+            return visitSimple(transitive);
+        }
+
+        private Map<Relation, Map<RelLiteral, List<RelLiteral>>> visitSimple(final Definition simpleDefinition) {
+            final Map<Relation, Map<RelLiteral, List<RelLiteral>>> trivialImplications = new LinkedHashMap<>();
+            for (final Constraint dep : Wmm.computeConstraintDependencies(simpleDefinition)) {
+                final Definition definition = (Definition) dep;
+                final Relation relation = definition.getDefinedRelation();
+                final Map<RelLiteral, List<RelLiteral>> curImplications = new LinkedHashMap<>();
+                final EventGraph maySet = ra.getKnowledge(relation).getMaySet();
+                for (final Map.Entry<RelLiteral, List<RelLiteral>> implicationsForReason : implications.entrySet()) {
+                    final RelLiteral reason = implicationsForReason.getKey();
+                    final Event first = reason.getSource();
+                    final Event second = reason.getTarget();
+                    if (maySet.contains(first, second)) {
+                        final RelLiteral newReason = new RelLiteral(relation, first, second, true);
+                        curImplications.put(newReason, implicationsForReason.getValue());
+                    }
+                }
+                if (!curImplications.isEmpty()) {
+                    trivialImplications.putAll(visit(definition, curImplications));
+                }
+            }
+            return trivialImplications;
+        }
     }
 }
