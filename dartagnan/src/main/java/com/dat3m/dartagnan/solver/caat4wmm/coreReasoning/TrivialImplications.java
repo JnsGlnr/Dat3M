@@ -1,7 +1,9 @@
 package com.dat3m.dartagnan.solver.caat4wmm.coreReasoning;
 
 import com.dat3m.dartagnan.encoding.EncodingContext;
+import com.dat3m.dartagnan.program.analysis.ExecutionAnalysis;
 import com.dat3m.dartagnan.program.event.Event;
+import com.dat3m.dartagnan.verification.Context;
 import com.dat3m.dartagnan.wmm.Constraint;
 import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
@@ -14,8 +16,7 @@ import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 
 import java.util.*;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonMap;
+import static java.util.Collections.*;
 
 public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Set<RelLiteral>>>> trivialImplications) {
 
@@ -78,6 +79,7 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
 
         private final EncodingContext context;
         private final RelationAnalysis ra;
+        private final ExecutionAnalysis exec;
         private final Relation eazyRel;
         private final Set<Definition> visited;
 
@@ -85,7 +87,9 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
 
         private TrivialImplicationsVisitor(final EncodingContext context, final Relation eazyRel, final EventGraph encodeSet) {
             this.context = context;
-            this.ra = context.getAnalysisContext().get(RelationAnalysis.class);
+            final Context analysisContext = context.getAnalysisContext();
+            this.ra = analysisContext.get(RelationAnalysis.class);
+            this.exec = analysisContext.get(ExecutionAnalysis.class);
             this.eazyRel = eazyRel;
             this.visited = new HashSet<>();
             this.implications = new LinkedHashMap<>();
@@ -182,18 +186,27 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
             final Relation right = composition.getRightOperand();
             for (final Relation relation : new Relation[] {left, right}) {
                 final boolean isLeft = relation == left;
-                final EventGraph otherMustOperands = ra.getKnowledge(isLeft ? right : left).getMustSet();
-                final Map<RelLiteral, Set<RelLiteral>> curImplications = new LinkedHashMap<>();
                 final EventGraph maySet = ra.getKnowledge(relation).getMaySet();
+                final Map<Event, Set<Event>> mayMap = isLeft ? maySet.getOutMap() : maySet.getInMap();
+                final Relation otherRelation = isLeft ? right : left;
+                final EventGraph otherMustSet = ra.getKnowledge(otherRelation).getMustSet();
+                final Map<Event, Set<Event>> mustMap = isLeft ? otherMustSet.getInMap() : otherMustSet.getOutMap();
+                final Map<RelLiteral, Set<RelLiteral>> curImplications = new LinkedHashMap<>();
                 for (final Map.Entry<RelLiteral, Set<RelLiteral>> implicationsForReason : implications.entrySet()) {
                     final RelLiteral reason = implicationsForReason.getKey();
+                    final Set<RelLiteral> implications = implicationsForReason.getValue();
                     final Event first = reason.getSource();
                     final Event second = reason.getTarget();
-                    if (maySet.contains(first, second)) {
-                        final Event commonEvent = isLeft ? second : first;
-                        if (otherMustOperands.contains(commonEvent, commonEvent)) {
-                            final RelLiteral newReason = new RelLiteral(relation, first, second, true);
-                            curImplications.put(newReason, implicationsForReason.getValue());
+                    final Event start = isLeft ? first : second;
+                    final Event end = isLeft ? second : first;
+                    final boolean isImplied = exec.isImplied(start, end);
+                    final Set<Event> mustSet = mustMap.getOrDefault(end, emptySet());
+                    for (final Event inter : mayMap.get(start)) {
+                        if (mustSet.contains(inter) && (isImplied || exec.isImplied(inter, end))) {
+                            final Event newFirst = isLeft ? start : inter;
+                            final Event newSecond = isLeft ? inter : start;
+                            final RelLiteral newReason = new RelLiteral(relation, newFirst, newSecond, true);
+                            curImplications.put(newReason, implications);
                         }
                     }
                 }
