@@ -158,6 +158,24 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Li
         }
 
         @Override
+        public Map<Relation, Map<RelLiteral, List<RelLiteral>>> visitInverse(final Inverse inverse) {
+            final Map<Relation, Map<RelLiteral, List<RelLiteral>>> trivialImplications = new LinkedHashMap<>();
+            final Relation relation = inverse.getOperand();
+            final Map<RelLiteral, List<RelLiteral>> curImplications = new LinkedHashMap<>();
+            for (final Map.Entry<RelLiteral, List<RelLiteral>> implicationsForReason : implications.entrySet()) {
+                final RelLiteral reason = implicationsForReason.getKey();
+                final Event first = reason.getSource();
+                final Event second = reason.getTarget();
+                final RelLiteral newReason = new RelLiteral(relation, second, first, true);
+                curImplications.put(newReason, implicationsForReason.getValue());
+            }
+            if (!curImplications.isEmpty()) {
+                trivialImplications.putAll(visit(relation.getDefinition(), curImplications));
+            }
+            return trivialImplications;
+        }
+
+        @Override
         public Map<Relation, Map<RelLiteral, List<RelLiteral>>> visitComposition(final Composition composition) {
             final Map<Relation, Map<RelLiteral, List<RelLiteral>>> trivialImplications = new LinkedHashMap<>();
             final Relation left = composition.getLeftOperand();
