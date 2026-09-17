@@ -474,7 +474,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
 
     private TrivialImplications getTrivialImplications(Collection<? extends Constraint> eazyConstraints) {
         final ActiveSetAnalysis asa = context.getAnalysisContext().requires(ActiveSetAnalysis.class);
-        final Map<Relation, Map<Relation, Map<RelLiteral, Set<RelLiteral>>>> result = new LinkedHashMap<>();
+        final Map<Relation, Map<Relation, Map<RelLiteral, Set<TrivialImplications.Implied>>>> result = new LinkedHashMap<>();
         for (Constraint eazyConstraint : eazyConstraints) {
             for (final Definition eazyDef : getEazyDefinitions(eazyConstraint)) {
                 final Relation eazyRel = eazyDef.getDefinedRelation();
