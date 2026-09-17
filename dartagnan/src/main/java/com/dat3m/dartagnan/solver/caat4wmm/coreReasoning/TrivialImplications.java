@@ -18,20 +18,23 @@ import java.util.*;
 
 import static java.util.Collections.*;
 
-public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Set<RelLiteral>>>> trivialImplications) {
+public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Set<Implied>>>> trivialImplications) {
 
     public BooleanFormula encode(EncodingContext context) {
         final BooleanFormulaManager bmgr = context.getBooleanFormulaManager();
         final List<BooleanFormula> enc = new ArrayList<>();
-        for (Map.Entry<Relation, Map<Relation, Map<RelLiteral, Set<RelLiteral>>>> implicationsForConstraint : trivialImplications.entrySet()) {
+        for (Map.Entry<Relation, Map<Relation, Map<RelLiteral, Set<Implied>>>> implicationsForConstraint : trivialImplications.entrySet()) {
             final Relation eazyRel = implicationsForConstraint.getKey();
-            for (Map.Entry<Relation, Map<RelLiteral, Set<RelLiteral>>> implicationsForConstraintAndRel : implicationsForConstraint.getValue().entrySet()) {
+            for (Map.Entry<Relation, Map<RelLiteral, Set<Implied>>> implicationsForConstraintAndRel : implicationsForConstraint.getValue().entrySet()) {
                 final Relation rel = implicationsForConstraintAndRel.getKey();
                 if (rel != eazyRel) {
-                    for (Map.Entry<RelLiteral, Set<RelLiteral>> reasonsForEdge : implicationsForConstraintAndRel.getValue().entrySet()) {
+                    for (Map.Entry<RelLiteral, Set<Implied>> reasonsForEdge : implicationsForConstraintAndRel.getValue().entrySet()) {
                         final RelLiteral first = reasonsForEdge.getKey();
-                        for (RelLiteral second : reasonsForEdge.getValue()) {
-                            enc.add(bmgr.implication(context.edge(rel, first.getSource(), first.getTarget()), context.edge(eazyRel, second.getSource(), second.getTarget())));
+                        final BooleanFormula firstEdge = context.edge(rel, first.getSource(), first.getTarget());
+                        for (Implied implied : reasonsForEdge.getValue()) {
+                            final RelLiteral second = implied.literal();
+                            final BooleanFormula secondEdge = context.edge(eazyRel, second.getSource(), second.getTarget());
+                            enc.add(implied.isEquivalent() ? bmgr.equivalence(firstEdge, secondEdge) : bmgr.implication(firstEdge, secondEdge));
                         }
                     }
                 }
@@ -48,34 +51,40 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
         if (reasonRel == impliedRel) {
             return true;
         }
-        final Map<RelLiteral, Set<RelLiteral>> trivialImplicationsForDefAndRel =
+        final Map<RelLiteral, Set<Implied>> trivialImplicationsForDefAndRel =
                 getTrivialImplicationForDefAndRel(impliedRel, reasonRel);
         if (trivialImplicationsForDefAndRel == null) {
             return false;
         }
-        final Set<RelLiteral> trivialImplicationsWithEvent = trivialImplicationsForDefAndRel.get(new RelLiteral(reasonRel, first, second, true));
+        final Set<Implied> trivialImplicationsWithEvent = trivialImplicationsForDefAndRel.get(new RelLiteral(reasonRel, first, second, true));
         if (trivialImplicationsWithEvent == null) {
             return false;
         }
-        return trivialImplicationsWithEvent.contains(new RelLiteral(impliedRel, first, second, true));
+        final RelLiteral literal = new RelLiteral(impliedRel, first, second, true);
+        for (final Implied implied : trivialImplicationsWithEvent) {
+            if (implied.literal().equals(literal)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private Map<RelLiteral, Set<RelLiteral>> getTrivialImplicationForDefAndRel(Relation constraint, Relation rel) {
-        final Map<Relation, Map<RelLiteral, Set<RelLiteral>>> trivialImplicationsForDef = trivialImplications.get(constraint);
+    private Map<RelLiteral, Set<Implied>> getTrivialImplicationForDefAndRel(Relation constraint, Relation rel) {
+        final Map<Relation, Map<RelLiteral, Set<Implied>>> trivialImplicationsForDef = trivialImplications.get(constraint);
         if (trivialImplicationsForDef == null) {
             return null;
         }
         return trivialImplicationsForDef.get(rel);
     }
 
-    public static Map<Relation, Map<RelLiteral, Set<RelLiteral>>> getTrivialImplications(
+    public static Map<Relation, Map<RelLiteral, Set<Implied>>> getTrivialImplications(
             final EncodingContext context, final Relation eazyRel, final EventGraph encodeSet
     ) {
         final TrivialImplicationsVisitor visitor = new TrivialImplicationsVisitor(context, eazyRel, encodeSet);
         return eazyRel.getDefinition().accept(visitor);
     }
 
-    private static class TrivialImplicationsVisitor implements Constraint.Visitor<Map<Relation, Map<RelLiteral, Set<RelLiteral>>>> {
+    private static class TrivialImplicationsVisitor implements Constraint.Visitor<Map<Relation, Map<RelLiteral, Set<Implied>>>> {
 
         private final EncodingContext context;
         private final RelationAnalysis ra;
@@ -83,7 +92,7 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
         private final Relation eazyRel;
         private final Set<Definition> visited;
 
-        private Map<RelLiteral, Set<RelLiteral>> implications;
+        private Map<RelLiteral, Set<Implied>> implications;
 
         private TrivialImplicationsVisitor(final EncodingContext context, final Relation eazyRel, final EventGraph encodeSet) {
             this.context = context;
@@ -97,22 +106,22 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
             encodeSet.apply((e1, e2) -> {
                 if (!mustSet.contains(e1, e2)) {
                     final RelLiteral literal = new RelLiteral(eazyRel, e1, e2, true);
-                    implications.computeIfAbsent(literal, k -> new LinkedHashSet<>()).add(literal);
+                    implications.computeIfAbsent(literal, k -> new LinkedHashSet<>()).add(new Implied(literal, false));
                 }
             });
 
             visited.add(eazyRel.getDefinition());
         }
 
-        private Map<Relation, Map<RelLiteral, Set<RelLiteral>>> visit(final Definition definition, final Map<RelLiteral, Set<RelLiteral>> implications) {
+        private Map<Relation, Map<RelLiteral, Set<Implied>>> visit(final Definition definition, final Map<RelLiteral, Set<Implied>> implications) {
             final Relation rel = definition.getDefinedRelation();
             if (rel != eazyRel && context.isEncoded(definition)) {
                 return singletonMap(rel, implications);
             }
             if (visited.add(definition)) {
-                final Map<RelLiteral, Set<RelLiteral>> oldImplications = this.implications;
+                final Map<RelLiteral, Set<Implied>> oldImplications = this.implications;
                 this.implications = implications;
-                final Map<Relation, Map<RelLiteral, Set<RelLiteral>>> result = definition.accept(this);
+                final Map<Relation, Map<RelLiteral, Set<Implied>>> result = definition.accept(this);
                 this.implications = oldImplications;
                 return result;
             }
@@ -120,23 +129,23 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
         }
 
         @Override
-        public Map<Relation, Map<RelLiteral, Set<RelLiteral>>> visitDefinition(final Definition definition) {
+        public Map<Relation, Map<RelLiteral, Set<Implied>>> visitDefinition(final Definition definition) {
             return emptyMap();
         }
 
         @Override
-        public Map<Relation, Map<RelLiteral, Set<RelLiteral>>> visitUnion(final Union union) {
+        public Map<Relation, Map<RelLiteral, Set<Implied>>> visitUnion(final Union union) {
             return visitSimple(union);
         }
 
         @Override
-        public Map<Relation, Map<RelLiteral, Set<RelLiteral>>> visitIntersection(final Intersection intersection) {
-            final Map<Relation, Map<RelLiteral, Set<RelLiteral>>> trivialImplications = new LinkedHashMap<>();
+        public Map<Relation, Map<RelLiteral, Set<Implied>>> visitIntersection(final Intersection intersection) {
+            final Map<Relation, Map<RelLiteral, Set<Implied>>> trivialImplications = new LinkedHashMap<>();
             final Collection<Relation> operands = intersection.getOperands();
             for (final Relation relation : operands) {
-                final Map<RelLiteral, Set<RelLiteral>> curImplications = new LinkedHashMap<>();
+                final Map<RelLiteral, Set<Implied>> curImplications = new LinkedHashMap<>();
                 final EventGraph maySet = ra.getKnowledge(relation).getMaySet();
-                for (final Map.Entry<RelLiteral, Set<RelLiteral>> implicationsForReason : implications.entrySet()) {
+                for (final Map.Entry<RelLiteral, Set<Implied>> implicationsForReason : implications.entrySet()) {
                     final RelLiteral reason = implicationsForReason.getKey();
                     final Event first = reason.getSource();
                     final Event second = reason.getTarget();
@@ -162,11 +171,11 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
         }
 
         @Override
-        public Map<Relation, Map<RelLiteral, Set<RelLiteral>>> visitInverse(final Inverse inverse) {
-            final Map<Relation, Map<RelLiteral, Set<RelLiteral>>> trivialImplications = new LinkedHashMap<>();
+        public Map<Relation, Map<RelLiteral, Set<Implied>>> visitInverse(final Inverse inverse) {
+            final Map<Relation, Map<RelLiteral, Set<Implied>>> trivialImplications = new LinkedHashMap<>();
             final Relation relation = inverse.getOperand();
-            final Map<RelLiteral, Set<RelLiteral>> curImplications = new LinkedHashMap<>();
-            for (final Map.Entry<RelLiteral, Set<RelLiteral>> implicationsForReason : implications.entrySet()) {
+            final Map<RelLiteral, Set<Implied>> curImplications = new LinkedHashMap<>();
+            for (final Map.Entry<RelLiteral, Set<Implied>> implicationsForReason : implications.entrySet()) {
                 final RelLiteral reason = implicationsForReason.getKey();
                 final Event first = reason.getSource();
                 final Event second = reason.getTarget();
@@ -180,8 +189,8 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
         }
 
         @Override
-        public Map<Relation, Map<RelLiteral, Set<RelLiteral>>> visitComposition(final Composition composition) {
-            final Map<Relation, Map<RelLiteral, Set<RelLiteral>>> trivialImplications = new LinkedHashMap<>();
+        public Map<Relation, Map<RelLiteral, Set<Implied>>> visitComposition(final Composition composition) {
+            final Map<Relation, Map<RelLiteral, Set<Implied>>> trivialImplications = new LinkedHashMap<>();
             final Relation left = composition.getLeftOperand();
             final Relation right = composition.getRightOperand();
             for (final Relation relation : new Relation[] {left, right}) {
@@ -191,10 +200,10 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
                 final Relation otherRelation = isLeft ? right : left;
                 final EventGraph otherMustSet = ra.getKnowledge(otherRelation).getMustSet();
                 final Map<Event, Set<Event>> mustMap = isLeft ? otherMustSet.getInMap() : otherMustSet.getOutMap();
-                final Map<RelLiteral, Set<RelLiteral>> curImplications = new LinkedHashMap<>();
-                for (final Map.Entry<RelLiteral, Set<RelLiteral>> implicationsForReason : implications.entrySet()) {
+                final Map<RelLiteral, Set<Implied>> curImplications = new LinkedHashMap<>();
+                for (final Map.Entry<RelLiteral, Set<Implied>> implicationsForReason : implications.entrySet()) {
                     final RelLiteral reason = implicationsForReason.getKey();
-                    final Set<RelLiteral> implications = implicationsForReason.getValue();
+                    final Set<Implied> implications = implicationsForReason.getValue();
                     final Event first = reason.getSource();
                     final Event second = reason.getTarget();
                     final Event start = isLeft ? first : second;
@@ -218,23 +227,23 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
         }
 
         @Override
-        public Map<Relation, Map<RelLiteral, Set<RelLiteral>>> visitSetIdentity(final SetIdentity setIdentity) {
+        public Map<Relation, Map<RelLiteral, Set<Implied>>> visitSetIdentity(final SetIdentity setIdentity) {
             return visitSimple(setIdentity);
         }
 
         @Override
-        public Map<Relation, Map<RelLiteral, Set<RelLiteral>>> visitTransitiveClosure(final TransitiveClosure transitive) {
+        public Map<Relation, Map<RelLiteral, Set<Implied>>> visitTransitiveClosure(final TransitiveClosure transitive) {
             return visitSimple(transitive);
         }
 
-        private Map<Relation, Map<RelLiteral, Set<RelLiteral>>> visitSimple(final Definition simpleDefinition) {
-            final Map<Relation, Map<RelLiteral, Set<RelLiteral>>> trivialImplications = new LinkedHashMap<>();
+        private Map<Relation, Map<RelLiteral, Set<Implied>>> visitSimple(final Definition simpleDefinition) {
+            final Map<Relation, Map<RelLiteral, Set<Implied>>> trivialImplications = new LinkedHashMap<>();
             for (final Constraint dep : Wmm.computeConstraintDependencies(simpleDefinition)) {
                 final Definition definition = (Definition) dep;
                 final Relation relation = definition.getDefinedRelation();
-                final Map<RelLiteral, Set<RelLiteral>> curImplications = new LinkedHashMap<>();
+                final Map<RelLiteral, Set<Implied>> curImplications = new LinkedHashMap<>();
                 final EventGraph maySet = ra.getKnowledge(relation).getMaySet();
-                for (final Map.Entry<RelLiteral, Set<RelLiteral>> implicationsForReason : implications.entrySet()) {
+                for (final Map.Entry<RelLiteral, Set<Implied>> implicationsForReason : implications.entrySet()) {
                     final RelLiteral reason = implicationsForReason.getKey();
                     final Event first = reason.getSource();
                     final Event second = reason.getTarget();
@@ -250,17 +259,20 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
             return trivialImplications;
         }
 
-        private static void merge(final Map<Relation, Map<RelLiteral, Set<RelLiteral>>> curImplications,
-                                  final Map<Relation, Map<RelLiteral, Set<RelLiteral>>> newImplications) {
-            for (final Map.Entry<Relation, Map<RelLiteral, Set<RelLiteral>>> newImplicationsForRel : newImplications.entrySet()) {
-                final Map<RelLiteral, Set<RelLiteral>> curRelImplications =
+        private static void merge(final Map<Relation, Map<RelLiteral, Set<Implied>>> curImplications,
+                                  final Map<Relation, Map<RelLiteral, Set<Implied>>> newImplications) {
+            for (final Map.Entry<Relation, Map<RelLiteral, Set<Implied>>> newImplicationsForRel : newImplications.entrySet()) {
+                final Map<RelLiteral, Set<Implied>> curRelImplications =
                         curImplications.computeIfAbsent(newImplicationsForRel.getKey(), k -> new LinkedHashMap<>());
-                final Map<RelLiteral, Set<RelLiteral>> newRelImplications = newImplicationsForRel.getValue();
-                for (final Map.Entry<RelLiteral, Set<RelLiteral>> newRelImplicationsForEvent : newRelImplications.entrySet()) {
+                final Map<RelLiteral, Set<Implied>> newRelImplications = newImplicationsForRel.getValue();
+                for (final Map.Entry<RelLiteral, Set<Implied>> newRelImplicationsForEvent : newRelImplications.entrySet()) {
                     curRelImplications.computeIfAbsent(newRelImplicationsForEvent.getKey(), k -> new LinkedHashSet<>())
                             .addAll(newRelImplicationsForEvent.getValue());
                 }
             }
         }
+    }
+
+    public record Implied(RelLiteral literal, boolean isEquivalent) {
     }
 }
