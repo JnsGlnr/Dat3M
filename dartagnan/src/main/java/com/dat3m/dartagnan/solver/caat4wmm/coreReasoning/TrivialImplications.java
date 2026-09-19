@@ -30,18 +30,25 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
                 final Relation rel = implicationsForConstraintAndRel.getKey();
                 if (rel != eazyRel) {
                     for (Map.Entry<RelLiteral, Set<Implied>> reasonsForEdge : implicationsForConstraintAndRel.getValue().entrySet()) {
-                        final RelLiteral first = reasonsForEdge.getKey();
-                        final BooleanFormula firstEdge = context.edge(rel, first.getSource(), first.getTarget());
+                        final BooleanFormula first = encodeLiteral(context, reasonsForEdge.getKey());
                         for (Implied implied : reasonsForEdge.getValue()) {
-                            final RelLiteral second = implied.literal();
-                            final BooleanFormula secondEdge = context.edge(eazyRel, second.getSource(), second.getTarget());
-                            enc.add(implied.isEquivalent() ? bmgr.equivalence(firstEdge, secondEdge) : bmgr.implication(firstEdge, secondEdge));
+                            final BooleanFormula second = encodeLiteral(context, implied.literal());
+                            enc.add(implied.isEquivalent() ? bmgr.equivalence(first, second) : bmgr.implication(first, second));
                         }
                     }
                 }
             }
         }
         return bmgr.and(enc);
+    }
+
+    private BooleanFormula encodeLiteral(final EncodingContext context, final RelLiteral relLiteral) {
+        final BooleanFormulaManager bmgr = context.getBooleanFormulaManager();
+        final Relation rel = relLiteral.getRelation();
+        final Event first = relLiteral.getSource();
+        final Event second = relLiteral.getTarget();
+        final BooleanFormula edge = context.edge(rel, first, second);
+        return relLiteral.isPositive() ? edge : bmgr.and(context.execution(first, second), bmgr.not(edge));
     }
 
     public boolean isTrivial(Relation reasonRel, Relation impliedRel, Event event) {
@@ -168,6 +175,44 @@ public record TrivialImplications(Map<Relation, Map<Relation, Map<RelLiteral, Se
                     merge(trivialImplications, visit(relation.getDefinition(), curImplications));
                 }
             }
+            return trivialImplications;
+        }
+
+        @Override
+        public Map<Relation, Map<RelLiteral, Set<Implied>>> visitDifference(final Difference difference) {
+            final Map<Relation, Map<RelLiteral, Set<Implied>>> trivialImplications = new LinkedHashMap<>();
+            final Relation minuend = difference.getMinuend();
+            final Relation subtrahend = difference.getSubtrahend();
+            final Map<RelLiteral, Set<Implied>> curImplications = new LinkedHashMap<>();
+            final RelationAnalysis.Knowledge minuendKnowledge = ra.getKnowledge(minuend);
+            final EventGraph minuendMaySet = minuendKnowledge.getMaySet();
+            final EventGraph subtrahendMaySet = ra.getKnowledge(subtrahend).getMaySet();
+            for (final Map.Entry<RelLiteral, Set<Implied>> implicationsForReason : implications.entrySet()) {
+                final RelLiteral reason = implicationsForReason.getKey();
+                final Event first = reason.getSource();
+                final Event second = reason.getTarget();
+                if (minuendMaySet.contains(first, second) && !subtrahendMaySet.contains(first, second)) {
+                    final RelLiteral newReason = new RelLiteral(minuend, first, second, true);
+                    curImplications.put(newReason, implicationsForReason.getValue());
+                }
+            }
+            if (!curImplications.isEmpty()) {
+                merge(trivialImplications, visit(minuend.getDefinition(), curImplications));
+            }
+            final EventGraph minuendMustSet = minuendKnowledge.getMustSet();
+            for (final Map.Entry<RelLiteral, Set<Implied>> implicationsForReason : implications.entrySet()) {
+                final RelLiteral reason = implicationsForReason.getKey();
+                final Event first = reason.getSource();
+                final Event second = reason.getTarget();
+                if (minuendMustSet.contains(first, second) && subtrahendMaySet.contains(first, second)) {
+                    final RelLiteral newReason = new RelLiteral(subtrahend, first, second, false);
+                    curImplications.put(newReason, withoutEquivalence(implicationsForReason.getValue()));
+                }
+            }
+            if (!curImplications.isEmpty()) {
+                merge(trivialImplications, visit(subtrahend.getDefinition(), curImplications));
+            }
+            curImplications.clear();
             return trivialImplications;
         }
 
