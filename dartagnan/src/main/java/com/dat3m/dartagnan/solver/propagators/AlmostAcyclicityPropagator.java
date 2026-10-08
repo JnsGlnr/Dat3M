@@ -286,7 +286,7 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
                     getBackend().propagateConflict(conflict.toArray(new BooleanFormula[0]));
                     raisedConflict = true;
                 } else if (enableTheoryPropagation) {
-                    backwardBfsPropagate(graph, edge, ingoingMap);
+                    backwardBfsPropagate(otherGraph, edge, ingoingMap);
                 }
             } else {
                 otherGraphs.add(otherGraph);
@@ -337,14 +337,15 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
         ingoingMap[addedEdge.getTarget()] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(addedEdge, false), null);
 
         do {
+            final int id = workqueue.poll().id();
             // Forward BFS
-            for (VarGraph.Edge outEdge : transitiveGraph.getTrueOutEdges(workqueue.poll().id())) {
+            for (VarGraph.Edge outEdge : transitiveGraph.getTrueOutEdges(id)) {
                 final int next = outEdge.getTarget();
                 if (next == target) {
                     // Found cycle
                     ingoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(outEdge, true), null);
                     return true;
-                } else if (ingoingMap[next] == null) {
+                } else if (next != id && ingoingMap[next] == null) {
                     ingoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(outEdge, true), null);
                     workqueue.add(new AlmostAcyclicityNode(next, false));
                 }
@@ -377,7 +378,7 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
                             // Found cycle
                             ingoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(outEdge, false), null);
                             return true;
-                        } else{
+                        } else {
                             final AlmostAcyclicityReason oldInEdge = ingoingMap[next];
                             if (oldInEdge == null) {
                                 ingoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(outEdge, false), null);
@@ -396,7 +397,7 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
                     // Found cycle
                     ingoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(outEdge, true), null);
                     return true;
-                } else {
+                } else if (next != target && next != id) {
                     final AlmostAcyclicityReason oldInEdge = ingoingMap[next];
                     if (oldInEdge == null) {
                         final AlmostAcyclicityEdge edge = new AlmostAcyclicityEdge(outEdge, true);
@@ -425,7 +426,8 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
         // Do backward BFS to collect disabled edges
         final List<AlmostAcyclicityBridge> disabledEdgesToPropagate = new ArrayList<>();
         do {
-            for (VarGraph.Edge inEdge : graph.getInEdges(workqueue.poll().id())) {
+            final int id = workqueue.poll().id();
+            for (VarGraph.Edge inEdge : graph.getInEdges(id)) {
                 if (inEdge.isFalse()) {
                     continue;
                 }
@@ -437,7 +439,7 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
                     /*if ( !alreadyPropagatedEdges.contains(inEdge)) {
                         System.out.println("New prop reason for: " + inEdge);
                     }*/
-                } else if (inEdge.isTrue() && outgoingMap[next] == null) {
+                } else if (inEdge.isTrue() && id != next && outgoingMap[next] == null) {
                     outgoingMap[next] = new AlmostAcyclicityReason(null, new AlmostAcyclicityEdge(inEdge, true));
                     workqueue.add(new AlmostAcyclicityNode(next, false));
                 }
@@ -501,7 +503,7 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
                     /*if ( !alreadyPropagatedEdges.contains(inEdge)) {
                         System.out.println("New prop reason for: " + inEdge);
                     }*/
-                } else if (inEdge.isTrue()) {
+                } else if (inEdge.isTrue() && next != id) {
                     final AlmostAcyclicityReason oldOutEdge = outgoingMap[next];
                     if (oldOutEdge == null) {
                         final AlmostAcyclicityEdge edge = new AlmostAcyclicityEdge(inEdge, true);
