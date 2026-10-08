@@ -533,12 +533,14 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
             final List<BooleanFormula> reason = new ArrayList<>();
 
             // Collect reason backwards
-            int cur = graphEdge.getSource();
+            boolean isStart = true;
+            final int start = graphEdge.getSource();
+            int cur = start;
             AlmostAcyclicityReason reasonEdge;
             AlmostAcyclicityEdge curEdge;
             VarGraph.Edge curGraphEdge;
             boolean otherEdgeSeen = !isOutgoingTransitive;
-            while ((reasonEdge = ingoingMap[cur]) != null) {
+            while ((reasonEdge = ingoingMap[cur]) != null && (isTransitive || isStart || cur != start)) {
                 curEdge = otherEdgeSeen ? reasonEdge.unsatisfiedEdge() : reasonEdge.satisfiedEdge();
                 if (!curEdge.isTransitive()) {
                     otherEdgeSeen = true;
@@ -546,6 +548,7 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
                 curGraphEdge = curEdge.edge();
                 addToReason(reason, curGraphEdge);
                 cur = curGraphEdge.getSource();
+                isStart = false;
             }
 
             final int target = cur;
