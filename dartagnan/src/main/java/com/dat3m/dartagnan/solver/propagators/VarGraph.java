@@ -44,8 +44,8 @@ public class VarGraph {
         return addVarEdge(source, target, null, bmgr.not(exec));
     }
 
-    public void addVarEdge(int source, int target, BooleanFormula edgeVar) {
-        addVarEdge(source, target, edgeVar, bmgr.not(edgeVar));
+    public Edge addVarEdge(int source, int target, BooleanFormula edgeVar) {
+        return addVarEdge(source, target, edgeVar, bmgr.not(edgeVar));
     }
 
     public Edge addVarEdge(int source, int target, BooleanFormula edgeVar, BooleanFormula negEdgeFormula) {

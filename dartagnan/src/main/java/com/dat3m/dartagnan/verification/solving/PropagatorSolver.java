@@ -3,13 +3,17 @@ package com.dat3m.dartagnan.verification.solving;
 import com.dat3m.dartagnan.configuration.Property;
 import com.dat3m.dartagnan.encoding.*;
 import com.dat3m.dartagnan.smt.ProverWithTracker;
-import com.dat3m.dartagnan.solver.propagators.AcyclicityPropagatorNew;
+import com.dat3m.dartagnan.solver.propagators.AlmostAcyclicityPropagator;
 import com.dat3m.dartagnan.verification.Context;
 import com.dat3m.dartagnan.verification.ResultStatus;
 import com.dat3m.dartagnan.verification.Task;
 import com.dat3m.dartagnan.verification.VerificationTask;
 import com.dat3m.dartagnan.wmm.Constraint;
-import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
+import com.dat3m.dartagnan.wmm.Definition;
+import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
+import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
+import com.dat3m.dartagnan.wmm.definition.Composition;
+import com.dat3m.dartagnan.wmm.definition.TransitiveClosure;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sosy_lab.common.configuration.Configuration;
@@ -22,6 +26,7 @@ import org.sosy_lab.java_smt.api.SolverException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.dat3m.dartagnan.solver.propagators.AlmostAcyclicityPropagator.PropagatableIrreflexivity;
 import static com.dat3m.dartagnan.verification.ResultStatus.FAIL;
 import static com.dat3m.dartagnan.verification.ResultStatus.PASS;
 import static java.util.Collections.singletonList;
@@ -60,14 +65,44 @@ public class PropagatorSolver extends ModelChecker {
         final ProverWithTracker prover = this.prover;
 
         final List<Constraint> constraintsToEncode = new ArrayList<>();
-        final List<Acyclicity> axiomsToPropagate = new ArrayList<>();
+        final List<PropagatableIrreflexivity> axiomsToPropagate = new ArrayList<>();
         for (Constraint c : task.getMemoryModel().getAxioms()) {
-            if (c instanceof Acyclicity acyc) {
-                axiomsToPropagate.add(acyc);
-                constraintsToEncode.add(acyc.getRelation().getDefinition());
-            } else {
-                constraintsToEncode.add(c);
+            if (c instanceof Irreflexivity irref) {
+                if (irref.getRelation().getDefinition() instanceof final Composition comp) {
+                    final Definition left = comp.getLeftOperand().getDefinition();
+                    final Definition right = comp.getRightOperand().getDefinition();
+                    if (left instanceof final TransitiveClosure transitive && !(right instanceof TransitiveClosure)) {
+                        axiomsToPropagate.add(new PropagatableIrreflexivity(irref, transitive.getDefinedRelation(), right.getDefinedRelation()));
+                        constraintsToEncode.add(transitive.getOperand().getDefinition());
+                        constraintsToEncode.add(right);
+                        continue;
+                    } else if (right instanceof final TransitiveClosure transitive && !(left instanceof TransitiveClosure)) {
+                        axiomsToPropagate.add(new PropagatableIrreflexivity(irref, transitive.getDefinedRelation(), left.getDefinedRelation()));
+                        constraintsToEncode.add(transitive.getOperand().getDefinition());
+                        constraintsToEncode.add(left);
+                    } else if (left instanceof final TransitiveClosure transitive1) {
+                        final TransitiveClosure transitive2 = (TransitiveClosure) right;
+                        final RelationAnalysis ra = analysisContext.requires(RelationAnalysis.class);
+                        final RelationAnalysis.Knowledge k1 = ra.getKnowledge(transitive1.getDefinedRelation());
+                        final RelationAnalysis.Knowledge k2 = ra.getKnowledge(transitive2.getDefinedRelation());
+                        final int size1 = k1.getMaySet().size() - k1.getMustSet().size();
+                        final int size2 = k2.getMaySet().size() - k2.getMustSet().size();
+                        final TransitiveClosure transitive;
+                        final Definition other;
+                        if (size1 < size2) {
+                            transitive = transitive2;
+                            other = left;
+                        } else {
+                            transitive = transitive1;
+                            other = right;
+                        }
+                        axiomsToPropagate.add(new PropagatableIrreflexivity(irref, transitive.getDefinedRelation(), other.getDefinedRelation()));
+                        constraintsToEncode.add(transitive.getOperand().getDefinition());
+                        constraintsToEncode.add(other);
+                    }
+                }
             }
+            constraintsToEncode.add(c);
         }
 
         context = EncodingContext.of(task, analysisContext, solverContext.getFormulaManager(), constraintsToEncode);
@@ -77,8 +112,7 @@ public class PropagatorSolver extends ModelChecker {
         SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
 
         System.out.println("Propagating axioms: " + axiomsToPropagate);
-        //AcyclicityPropagator propagator = new AcyclicityPropagator(wmmEncoder, context);
-        AcyclicityPropagatorNew propagator = new AcyclicityPropagatorNew(wmmEncoder, context);
+        AlmostAcyclicityPropagator propagator = new AlmostAcyclicityPropagator(wmmEncoder, context);
         axiomsToPropagate.forEach(propagator::registerAxiom);
         prover.registerUserPropagator(propagator);
 
