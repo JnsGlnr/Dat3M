@@ -70,7 +70,7 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
         this.exec = new ExecGraph(domain.size());
         ingoingMap = new AlmostAcyclicityReason[domain.size()];
         outgoingMap = new AlmostAcyclicityReason[domain.size()];
-        execToMustEdges = new HashMap<>(domain.size() * 4 / 3);
+        execToMustEdges = new LinkedHashMap<>(domain.size() * 4 / 3);
         mustEdgeToExec = new HashMap<>();
     }
 
@@ -78,8 +78,8 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
     }
 
     public void registerAxiom(PropagatableIrreflexivity axiom) {
-        final VarGraph transitiveGraph = new VarGraph(domain.size(), context.getBooleanFormulaManager());
-        final VarGraph otherGraph = new VarGraph(domain.size(), context.getBooleanFormulaManager());
+        final VarGraph transitiveGraph = new VarGraph(domain, context.getBooleanFormulaManager());
+        final VarGraph otherGraph = new VarGraph(domain, context.getBooleanFormulaManager());
         final Case c = new Case(axiom.transitive, axiom.other, transitiveGraph, otherGraph);
         cases.add(c);
     }
@@ -286,12 +286,13 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
                     getBackend().propagateConflict(conflict.toArray(new BooleanFormula[0]));
                     raisedConflict = true;
                 } else if (enableTheoryPropagation) {
-                    backwardBfsPropagate(graph, edge, ingoingMap);
+                    propagateConsequences(other.graph.propagateOther(edge));
                 }
             } else {
                 otherGraphs.add(otherGraph);
             }
         }
+        // TODO(René): does this have to run every time?  `edge` is not always from a graph that is supposed to be acyclic.
         if (forwardBfsSearch(graph, otherGraphs, edge, ingoingMap)) {
             // We found a cycle
             final List<BooleanFormula> conflict = computeCycleReason(edge, ingoingMap);
@@ -299,7 +300,17 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
             getBackend().propagateConflict(conflict.toArray(new BooleanFormula[0]));
             raisedConflict = true;
         } else if (enableTheoryPropagation) {
-            backwardBfsPropagate(graph, otherGraphs, edge, ingoingMap);
+            propagateConsequences(graph.propagate(edge, otherGraphs));
+        }
+    }
+
+    private void propagateConsequences(Map<VarGraph.Edge, List<VarGraph.Edge>> approachingCycles) {
+        for (Map.Entry<VarGraph.Edge, List<VarGraph.Edge>> cycle : approachingCycles.entrySet()) {
+            final BooleanFormula consequence = cycle.getKey().getNegEdgeFormula();
+            final var premise = new ArrayList<BooleanFormula>();
+            cycle.getValue().forEach(x -> { assert x.isTrue(); });
+            cycle.getValue().forEach(x -> addToReason(premise, x));
+            getBackend().propagateConsequence(premise.toArray(new BooleanFormula[0]), consequence);
         }
     }
 
