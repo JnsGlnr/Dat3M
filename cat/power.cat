@@ -42,7 +42,8 @@ let propbase = (fence | (rfe;fence));hb*
 let prop = (W*W & propbase)| (com*;propbase*;sync;hb*)
 
 acyclic co | prop
-irreflexive fre;prop;hb*
+irreflexive fre;prop;hb+
+irreflexive fre;prop
 
 (* Atomic: Basic LDXR/STXR constraint to forbid intervening writes. *)
 empty rmw & (fre; coe) as atomic
