@@ -45,6 +45,13 @@ public final class IndexedDomain<E> {
         return fullSet;
     }
 
+    public IndexedSet<E> unitSet(int index) {
+        if (index < 0 || elements.length <= index) {
+            throw new IndexOutOfBoundsException("0 <= %d < %d".formatted(index, elements.length));
+        }
+        return new IndexedSet<>(this, null, index, false);
+    }
+
     public IndexedSet<E> newSet() {
         return new IndexedSet<>(this, null, -1, true);
     }
