@@ -4,7 +4,6 @@ import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 
 import java.util.*;
-import java.util.function.Predicate;
 
 public class VarGraph {
 
@@ -93,33 +92,26 @@ public class VarGraph {
     }
 
     public Iterable<Edge> getTrueOutEdges(int i) {
-        final var it = new FilteredIterator(outEdges[i], VarGraph::isEnabledEdge);
+        final var it = new EnabledIterator(outEdges[i]);
         return () -> it;
     }
 
-    private static boolean isEnabledEdge(Edge e) {
-        return e.value == TRUE;
-    }
-
-    private final static class FilteredIterator implements Iterator<Edge> {
+    private final static class EnabledIterator implements Iterator<Edge> {
         private final List<Edge> edges;
-        private final Predicate<Edge> filter;
         private int index = -1;
 
-        public FilteredIterator(List<Edge> edges, Predicate<Edge> filter) {
+        public EnabledIterator(List<Edge> edges) {
             this.edges = edges;
-            this.filter = filter;
             advance();
         }
 
         private void advance() {
             final List<Edge> edges = this.edges;
-            final Predicate<Edge> filter = this.filter;
             final int size = edges.size();
             int index = this.index;
             do {
                 index++;
-            } while (index < size && !filter.test(edges.get(index)));
+            } while (index < size && !edges.get(index).isTrue());
             this.index = index;
         }
 
