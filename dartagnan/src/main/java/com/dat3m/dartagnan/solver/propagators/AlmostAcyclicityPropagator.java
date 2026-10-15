@@ -185,6 +185,10 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
                 });
             }
         }
+        cases.forEach(c -> {
+            c.transitiveGraph.build();
+            c.otherGraph.build();
+        });
 
         formulaLookup = new CachingFormulaMap<>(numDynamicEdges.get() * 2, mustFormulas, lit2Formula::get);
         alreadyPropagatedEdges = Collections.newSetFromMap(new IdentityHashMap<>(numDynamicEdges.get()));
@@ -428,20 +432,18 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
         do {
             final int id = workqueue.poll().id();
             for (VarGraph.Edge inEdge : graph.getInEdges(id)) {
-                if (inEdge.isFalse()) {
-                    continue;
-                }
-
-                final int next = inEdge.getSource();
-                if (ingoingMap[next] != null && (allowDuplicatePropagation || !alreadyPropagatedEdges.contains(inEdge))) {
-                    assert inEdge.isUnassigned();
-                    disabledEdgesToPropagate.add(new AlmostAcyclicityBridge(new AlmostAcyclicityEdge(inEdge, true), true));
+                if (inEdge != null && !inEdge.isFalse()) {
+                    final int next = inEdge.getSource();
+                    if (ingoingMap[next] != null && (allowDuplicatePropagation || !alreadyPropagatedEdges.contains(inEdge))) {
+                        assert inEdge.isUnassigned();
+                        disabledEdgesToPropagate.add(new AlmostAcyclicityBridge(new AlmostAcyclicityEdge(inEdge, true), true));
                     /*if ( !alreadyPropagatedEdges.contains(inEdge)) {
                         System.out.println("New prop reason for: " + inEdge);
                     }*/
-                } else if (inEdge.isTrue() && id != next && outgoingMap[next] == null) {
-                    outgoingMap[next] = new AlmostAcyclicityReason(null, new AlmostAcyclicityEdge(inEdge, true));
-                    workqueue.add(new AlmostAcyclicityNode(next, false));
+                    } else if (inEdge.isTrue() && id != next && outgoingMap[next] == null) {
+                        outgoingMap[next] = new AlmostAcyclicityReason(null, new AlmostAcyclicityEdge(inEdge, true));
+                        workqueue.add(new AlmostAcyclicityNode(next, false));
+                    }
                 }
             }
         } while (!workqueue.isEmpty());
@@ -464,54 +466,50 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
             if (needsOtherEdge) {
                 for (final VarGraph otherGraph : otherGraphs) {
                     for (VarGraph.Edge inEdge : otherGraph.getInEdges(id)) {
-                        if (inEdge.isFalse()) {
-                            continue;
-                        }
-
-                        final int next = inEdge.getSource();
-                        final AlmostAcyclicityReason nextInEdge = ingoingMap[next];
-                        if (nextInEdge != null && nextInEdge.unsatisfiedEdge() != null && (allowDuplicatePropagation || !alreadyPropagatedEdges.contains(inEdge))) {
-                            assert inEdge.isUnassigned();
-                            disabledEdgesToPropagate.add(new AlmostAcyclicityBridge(new AlmostAcyclicityEdge(inEdge, false), false));
+                        if (inEdge != null && !inEdge.isFalse()) {
+                            final int next = inEdge.getSource();
+                            final AlmostAcyclicityReason nextInEdge = ingoingMap[next];
+                            if (nextInEdge != null && nextInEdge.unsatisfiedEdge() != null && (allowDuplicatePropagation || !alreadyPropagatedEdges.contains(inEdge))) {
+                                assert inEdge.isUnassigned();
+                                disabledEdgesToPropagate.add(new AlmostAcyclicityBridge(new AlmostAcyclicityEdge(inEdge, false), false));
                             /*if ( !alreadyPropagatedEdges.contains(inEdge)) {
                                 System.out.println("New prop reason for: " + inEdge);
                             }*/
-                        } else if (inEdge.isTrue()) {
-                            final AlmostAcyclicityReason oldOutEdge = outgoingMap[next];
-                            if (oldOutEdge == null) {
-                                outgoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(inEdge, false), null);
-                                workqueue.add(new AlmostAcyclicityNode(next, false));
-                            } else if (oldOutEdge.satisfiedEdge() == null) {
-                                outgoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(inEdge, false), oldOutEdge.unsatisfiedEdge());
-                                workqueue.add(new AlmostAcyclicityNode(next, false));
+                            } else if (inEdge.isTrue()) {
+                                final AlmostAcyclicityReason oldOutEdge = outgoingMap[next];
+                                if (oldOutEdge == null) {
+                                    outgoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(inEdge, false), null);
+                                    workqueue.add(new AlmostAcyclicityNode(next, false));
+                                } else if (oldOutEdge.satisfiedEdge() == null) {
+                                    outgoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(inEdge, false), oldOutEdge.unsatisfiedEdge());
+                                    workqueue.add(new AlmostAcyclicityNode(next, false));
+                                }
                             }
                         }
                     }
                 }
             }
             for (VarGraph.Edge inEdge : graph.getInEdges(id)) {
-                if (inEdge.isFalse()) {
-                    continue;
-                }
-
-                final int next = inEdge.getSource();
-                final AlmostAcyclicityReason nextInEdge = ingoingMap[next];
-                if (nextInEdge != null && (needsOtherEdge ? nextInEdge.satisfiedEdge() : nextInEdge.unsatisfiedEdge()) != null
-                        && (allowDuplicatePropagation || !alreadyPropagatedEdges.contains(inEdge))) {
-                    assert inEdge.isUnassigned();
-                    disabledEdgesToPropagate.add(new AlmostAcyclicityBridge(new AlmostAcyclicityEdge(inEdge, true), needsOtherEdge));
+                if (inEdge != null && !inEdge.isFalse()) {
+                    final int next = inEdge.getSource();
+                    final AlmostAcyclicityReason nextInEdge = ingoingMap[next];
+                    if (nextInEdge != null && (needsOtherEdge ? nextInEdge.satisfiedEdge() : nextInEdge.unsatisfiedEdge()) != null
+                            && (allowDuplicatePropagation || !alreadyPropagatedEdges.contains(inEdge))) {
+                        assert inEdge.isUnassigned();
+                        disabledEdgesToPropagate.add(new AlmostAcyclicityBridge(new AlmostAcyclicityEdge(inEdge, true), needsOtherEdge));
                     /*if ( !alreadyPropagatedEdges.contains(inEdge)) {
                         System.out.println("New prop reason for: " + inEdge);
                     }*/
-                } else if (inEdge.isTrue() && next != id) {
-                    final AlmostAcyclicityReason oldOutEdge = outgoingMap[next];
-                    if (oldOutEdge == null) {
-                        final AlmostAcyclicityEdge edge = new AlmostAcyclicityEdge(inEdge, true);
-                        outgoingMap[next] = new AlmostAcyclicityReason(needsOtherEdge ? null : edge, needsOtherEdge ? edge : null);
-                        workqueue.add(new AlmostAcyclicityNode(next, needsOtherEdge));
-                    } else if (!needsOtherEdge && oldOutEdge.satisfiedEdge() == null) {
-                        outgoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(inEdge, true), oldOutEdge.unsatisfiedEdge());
-                        workqueue.add(new AlmostAcyclicityNode(next, false));
+                    } else if (inEdge.isTrue() && next != id) {
+                        final AlmostAcyclicityReason oldOutEdge = outgoingMap[next];
+                        if (oldOutEdge == null) {
+                            final AlmostAcyclicityEdge edge = new AlmostAcyclicityEdge(inEdge, true);
+                            outgoingMap[next] = new AlmostAcyclicityReason(needsOtherEdge ? null : edge, needsOtherEdge ? edge : null);
+                            workqueue.add(new AlmostAcyclicityNode(next, needsOtherEdge));
+                        } else if (!needsOtherEdge && oldOutEdge.satisfiedEdge() == null) {
+                            outgoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(inEdge, true), oldOutEdge.unsatisfiedEdge());
+                            workqueue.add(new AlmostAcyclicityNode(next, false));
+                        }
                     }
                 }
             }

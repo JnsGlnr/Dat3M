@@ -13,8 +13,10 @@ public class VarGraph {
 
     final int domainSize;
     final Map<BooleanFormula, Edge> var2Edge = new HashMap<>();
-    final List<Edge>[] inEdges;
-    final List<Edge>[] outEdges;
+    private final List<Edge>[] preInEdges;
+    private final List<Edge>[] preOutEdges;
+    final Edge[][] inEdges;
+    final Edge[][] outEdges;
 
     private final List<Edge> trace = new ArrayList<>();
     private final List<Integer> backtrackPoints = new ArrayList<>();
@@ -27,12 +29,14 @@ public class VarGraph {
         this.bmgr = bmgr;
         this.domainSize = domainSize;
 
-        inEdges = (List<Edge>[]) new List[domainSize];
-        outEdges = (List<Edge>[]) new List[domainSize];
+        preInEdges = (List<Edge>[]) new List[domainSize];
+        preOutEdges = (List<Edge>[]) new List[domainSize];
         for (int i = 0; i < domainSize; i++) {
-            inEdges[i] = new ArrayList<>();
-            outEdges[i] = new ArrayList<>();
+            preInEdges[i] = new ArrayList<>();
+            preOutEdges[i] = new ArrayList<>();
         }
+        inEdges = new Edge[domainSize][domainSize];
+        outEdges = new Edge[domainSize][domainSize];
     }
 
     public Edge getEdge(BooleanFormula edgeVar) {
@@ -49,14 +53,29 @@ public class VarGraph {
 
     public Edge addVarEdge(int source, int target, BooleanFormula edgeVar, BooleanFormula negEdgeFormula) {
         final Edge edge = new Edge(source, target, edgeVar);
-        inEdges[target].add(edge);
-        outEdges[source].add(edge);
+        preInEdges[target].add(edge);
+        preOutEdges[source].add(edge);
 
         if (!edge.isMust()) {
             var2Edge.put(edgeVar, edge);
         }
         edge.negEdgeFormula = negEdgeFormula;
         return edge;
+    }
+
+    public void build() {
+        for (int i = 0; i < domainSize; ++i) {
+            final List<Edge> edges = preInEdges[i];
+            for (int j = 0; j < edges.size(); ++j) {
+                inEdges[i][j] = edges.get(j);
+            }
+        }
+        for (int i = 0; i < domainSize; ++i) {
+            final List<Edge> edges = preOutEdges[i];
+            for (int j = 0; j < edges.size(); ++j) {
+                outEdges[i][j] = edges.get(j);
+            }
+        }
     }
 
     public void push() {
@@ -87,7 +106,7 @@ public class VarGraph {
         e.value = UNASSIGNED;
     }
 
-    public Iterable<Edge> getInEdges(int i) {
+    public Edge[] getInEdges(int i) {
         return inEdges[i];
     }
 
@@ -97,32 +116,32 @@ public class VarGraph {
     }
 
     private final static class EnabledIterator implements Iterator<Edge> {
-        private final List<Edge> edges;
+        private final Edge[] edges;
         private int index = -1;
 
-        public EnabledIterator(List<Edge> edges) {
+        public EnabledIterator(Edge[] edges) {
             this.edges = edges;
             advance();
         }
 
         private void advance() {
-            final List<Edge> edges = this.edges;
-            final int size = edges.size();
+            final Edge[] edges = this.edges;
+            final int size = edges.length;
             int index = this.index;
             do {
                 index++;
-            } while (index < size && !edges.get(index).isTrue());
+            } while (index < size && (edges[index] == null || !edges[index].isTrue()));
             this.index = index;
         }
 
         @Override
         public boolean hasNext() {
-            return index < edges.size();
+            return index < edges.length;
         }
 
         @Override
         public Edge next() {
-            Edge e = edges.get(index);
+            Edge e = edges[index];
             advance();
             return e;
         }
