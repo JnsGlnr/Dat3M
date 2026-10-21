@@ -193,10 +193,8 @@ public class ExecutionGraph {
             case Emptiness _ -> {
                 if (innerPred instanceof RelationGraph innerGraph && eazyAxioms.test(axiom)) {
                     constraints.add(getMayConstraint(innerGraph, inner));
-                    yield new EmptinessConstraint(getEncodeGraph(innerGraph, axiom));
-                } else {
-                    yield new EmptinessConstraint(innerPred);
                 }
+                yield new EmptinessConstraint(innerPred);
             }
             case Irreflexivity irreflexivity -> {
                 if (eazyAxioms.test(axiom)) {
