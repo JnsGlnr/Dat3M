@@ -190,11 +190,9 @@ public class ExecutionGraph {
                 constraint = new AcyclicityConstraint((RelationGraph) innerPred);
             }
         } else if (axiom instanceof Emptiness) {
+            constraint = new EmptinessConstraint(innerPred);
             if (innerPred instanceof RelationGraph innerGraph && eazyAxioms.test(axiom)) {
-                constraint = new EmptinessConstraint(getEncodeGraph(innerGraph, axiom));
                 constraints.add(getMayConstraint(innerGraph, inner));
-            } else {
-                constraint = new EmptinessConstraint(innerPred);
             }
         } else if (axiom instanceof final Irreflexivity irreflexivity) {
             if (eazyAxioms.test(axiom)) {
