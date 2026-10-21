@@ -1,11 +1,18 @@
 package com.dat3m.dartagnan.solver.caat.constraints;
 
+import com.dat3m.dartagnan.encoding.ActiveSetAnalysis;
+import com.dat3m.dartagnan.program.event.Event;
 import com.dat3m.dartagnan.solver.caat.domain.Domain;
 import com.dat3m.dartagnan.solver.caat.predicates.CAATPredicate;
 import com.dat3m.dartagnan.solver.caat.predicates.Derivable;
 import com.dat3m.dartagnan.solver.caat.predicates.relationGraphs.Edge;
 import com.dat3m.dartagnan.solver.caat.predicates.relationGraphs.RelationGraph;
+import com.dat3m.dartagnan.solver.caat.predicates.relationGraphs.derived.TransitiveGraph;
+import com.dat3m.dartagnan.solver.caat4wmm.ExecutionGraph;
 import com.dat3m.dartagnan.solver.caat4wmm.ViolationPattern;
+import com.dat3m.dartagnan.wmm.Relation;
+import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
+import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import com.google.common.base.Preconditions;
 
 import java.util.ArrayList;
@@ -14,19 +21,23 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.dat3m.dartagnan.solver.caat.misc.PathAlgorithm.findShortestPath;
+
 public class IrreflexivityConstraint extends AbstractConstraint {
 
     private final RelationGraph constrainedGraph;
     private final List<Edge> violatingEdges = new ArrayList<>();
     private ViolationPattern pattern;
+    private ExecutionGraph executionGraph;
 
     public IrreflexivityConstraint(RelationGraph constrainedGraph) {
        this.constrainedGraph = constrainedGraph;
     }
 
-    public IrreflexivityConstraint(RelationGraph constrainedGraph, ViolationPattern pattern) {
+    public IrreflexivityConstraint(RelationGraph constrainedGraph, ViolationPattern pattern, ExecutionGraph graph) {
         this.constrainedGraph = constrainedGraph;
         this.pattern = pattern;
+        this.executionGraph = graph;
     }
 
     @Override
@@ -78,12 +89,35 @@ public class IrreflexivityConstraint extends AbstractConstraint {
                     final int source = cycleEventIds[edge.from().id()];
                     final int target = cycleEventIds[edge.to().id()];
                     final RelationGraph graph = edge.graph();
-                    edges.add(new GraphEdge(graph.getById(source, target), graph));
+                    final Edge graphEdge = graph.getById(source, target);
+                    if (edge.graph() instanceof TransitiveGraph) {
+                        final RelationGraph inner = (RelationGraph) graph.getDependencies().get(0);
+                        final List<Edge> path = findShortestPath(inner, graphEdge.getFirst(), graphEdge.getSecond(),
+                                pathEdge -> pathEdge.getDerivationLength() <= graphEdge.getDerivationLength() - 1
+                                        && isActive(pathEdge, inner));
+                        for (final Edge pathEdge : path) {
+                            edges.add(new GraphEdge(pathEdge, inner));
+                        }
+                    } else {
+                        edges.add(new GraphEdge(graph.getById(source, target), graph));
+                    }
                 }
                 cycles.add(edges);
             }
         }
         return cycles;
+    }
+
+    private boolean isActive(final Edge edge, final RelationGraph graph) {
+        final ActiveSetAnalysis asa = executionGraph.getAnalysisContext().requires(ActiveSetAnalysis.class);
+        final RelationAnalysis ra = executionGraph.getAnalysisContext().requires(RelationAnalysis.class);
+        final Relation rel = executionGraph.getRelation(graph);
+        final EventGraph activeSet = asa.getActiveSet(rel.getDefinition());
+        final EventGraph mustSet = ra.getKnowledge(rel).getMustSet();
+        if (domain.getObjectById(edge.getFirst()) instanceof final Event source && domain.getObjectById(edge.getSecond()) instanceof final Event target) {
+            return activeSet.contains(source, target) || mustSet.contains(source, target);
+        }
+        return true;
     }
 
     public static class GraphEdge extends Edge {

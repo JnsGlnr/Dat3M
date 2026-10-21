@@ -16,6 +16,7 @@ import com.dat3m.dartagnan.solver.caat.predicates.sets.derived.ProjectionSet;
 import com.dat3m.dartagnan.solver.caat.predicates.sets.derived.UnionSet;
 import com.dat3m.dartagnan.solver.caat4wmm.basePredicates.*;
 import com.dat3m.dartagnan.utils.dependable.DependencyGraph;
+import com.dat3m.dartagnan.verification.Context;
 import com.dat3m.dartagnan.verification.model.ExecutionModel;
 import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
@@ -43,6 +44,7 @@ public class ExecutionGraph {
     // assigned during construction.
 
     private final Wmm memoryModel;
+    private final Context analysisContext;
     private final Predicate<? super com.dat3m.dartagnan.wmm.Constraint> encodedConstraints;
     private final Predicate<? super Axiom> eazyAxioms;
     private final BiMap<Relation, CAATPredicate> predicateToRelationMap = HashBiMap.create();
@@ -55,8 +57,9 @@ public class ExecutionGraph {
 
     // ============= Construction & Init ===============
 
-    public ExecutionGraph(Wmm model, Predicate<? super com.dat3m.dartagnan.wmm.Constraint> encoded, Predicate<? super Axiom> eazy) {
+    public ExecutionGraph(Wmm model, Context analysisContext, Predicate<? super com.dat3m.dartagnan.wmm.Constraint> encoded, Predicate<? super Axiom> eazy) {
         memoryModel = Preconditions.checkNotNull(model);
+        this.analysisContext = Preconditions.checkNotNull(analysisContext);
         encodedConstraints = Preconditions.checkNotNull(encoded);
         eazyAxioms = Preconditions.checkNotNull(eazy);
         constructMappings();
@@ -118,6 +121,10 @@ public class ExecutionGraph {
     // =================================================
 
     // ================ Accessors =======================
+
+    public Context getAnalysisContext() {
+        return analysisContext;
+    }
 
     public CAATModel getCAATModel() { return caatModel; }
 
@@ -197,9 +204,9 @@ public class ExecutionGraph {
         } else if (axiom instanceof final Irreflexivity irreflexivity) {
             if (eazyAxioms.test(axiom)) {
                 constraint = new IrreflexivityConstraint((RelationGraph) innerPred,
-                        ViolationPattern.ofRelation(inner, predicateToRelationMap, true));
+                        ViolationPattern.ofRelation(inner, predicateToRelationMap, true), this);
                 for (final Definition definition : irreflexivity.getComponents()) {
-                    final Relation compositionRel = definition.getDefinedRelation();
+                    final Relation compositionRel = definition instanceof TransitiveClosure transitive ? transitive.getOperand() : definition.getDefinedRelation();
                     final RelationGraph compositionPred = (RelationGraph) predicateToRelationMap.get(compositionRel);
                     constraints.add(getMayConstraint(compositionPred, compositionRel));
                 }
