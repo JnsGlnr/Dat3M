@@ -10,6 +10,7 @@ import com.dat3m.dartagnan.verification.Task;
 import com.dat3m.dartagnan.verification.VerificationTask;
 import com.dat3m.dartagnan.wmm.Constraint;
 import com.dat3m.dartagnan.wmm.Definition;
+import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
 import com.dat3m.dartagnan.wmm.definition.Composition;
@@ -72,13 +73,15 @@ public class PropagatorSolver extends ModelChecker {
                     final Definition left = comp.getLeftOperand().getDefinition();
                     final Definition right = comp.getRightOperand().getDefinition();
                     if (left instanceof final TransitiveClosure transitive && !(right instanceof TransitiveClosure)) {
-                        axiomsToPropagate.add(new PropagatableIrreflexivity(irref, transitive.getDefinedRelation(), right.getDefinedRelation()));
-                        constraintsToEncode.add(transitive.getOperand().getDefinition());
+                        final Relation transitiveOperand = transitive.getOperand();
+                        axiomsToPropagate.add(new PropagatableIrreflexivity(irref, transitiveOperand, right.getDefinedRelation()));
+                        constraintsToEncode.add(transitiveOperand.getDefinition());
                         constraintsToEncode.add(right);
                         continue;
                     } else if (right instanceof final TransitiveClosure transitive && !(left instanceof TransitiveClosure)) {
-                        axiomsToPropagate.add(new PropagatableIrreflexivity(irref, transitive.getDefinedRelation(), left.getDefinedRelation()));
-                        constraintsToEncode.add(transitive.getOperand().getDefinition());
+                        final Relation transitiveOperand = transitive.getOperand();
+                        axiomsToPropagate.add(new PropagatableIrreflexivity(irref, transitiveOperand, left.getDefinedRelation()));
+                        constraintsToEncode.add(transitiveOperand.getDefinition());
                         constraintsToEncode.add(left);
                     } else if (left instanceof final TransitiveClosure transitive1) {
                         final TransitiveClosure transitive2 = (TransitiveClosure) right;
@@ -96,8 +99,9 @@ public class PropagatorSolver extends ModelChecker {
                             transitive = transitive1;
                             other = right;
                         }
-                        axiomsToPropagate.add(new PropagatableIrreflexivity(irref, transitive.getDefinedRelation(), other.getDefinedRelation()));
-                        constraintsToEncode.add(transitive.getOperand().getDefinition());
+                        final Relation transitiveOperand = transitive.getOperand();
+                        axiomsToPropagate.add(new PropagatableIrreflexivity(irref, transitiveOperand, other.getDefinedRelation()));
+                        constraintsToEncode.add(transitiveOperand.getDefinition());
                         constraintsToEncode.add(other);
                     }
                 }
