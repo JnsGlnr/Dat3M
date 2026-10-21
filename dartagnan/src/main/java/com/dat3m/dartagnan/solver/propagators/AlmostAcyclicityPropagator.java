@@ -105,7 +105,7 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
 
                 final EventGraph must = relationAnalysis.getKnowledge(transitive).getMustSet();
                 final EventGraph activeSet = wmmEncoder.getActiveSet(transitive.getDefinition());
-                activeSet.apply((x, y) -> {
+                EventGraph.union(activeSet, must).apply((x, y) -> {
                     final int idx = domain.indexOf(x);
                     final int idy = domain.indexOf(y);
                     final BooleanFormula edgeLit = context.edgeVariable(transitive.getNameOrTerm(), x, y);
@@ -149,7 +149,7 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
 
                 final EventGraph must = relationAnalysis.getKnowledge(other).getMustSet();
                 final EventGraph activeSet = wmmEncoder.getActiveSet(other.getDefinition());
-                activeSet.apply((x, y) -> {
+                EventGraph.union(activeSet, must).apply((x, y) -> {
                     final int idx = domain.indexOf(x);
                     final int idy = domain.indexOf(y);
                     final BooleanFormula edgeLit = context.edgeVariable(other.getNameOrTerm(), x, y);
@@ -410,6 +410,9 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
                     } else if (!needsOtherEdge && oldInEdge.satisfiedEdge() == null) {
                         ingoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(outEdge, true), oldInEdge.unsatisfiedEdge());
                         workqueue.add(new AlmostAcyclicityNode(next, false));
+                    } else if (needsOtherEdge && oldInEdge.unsatisfiedEdge() == null) {
+                        ingoingMap[next] = new AlmostAcyclicityReason(oldInEdge.satisfiedEdge(), new AlmostAcyclicityEdge(outEdge, true));
+                        workqueue.add(new AlmostAcyclicityNode(next, true));
                     }
                 }
             }
@@ -509,6 +512,9 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
                         } else if (!needsOtherEdge && oldOutEdge.satisfiedEdge() == null) {
                             outgoingMap[next] = new AlmostAcyclicityReason(new AlmostAcyclicityEdge(inEdge, true), oldOutEdge.unsatisfiedEdge());
                             workqueue.add(new AlmostAcyclicityNode(next, false));
+                        } else if (needsOtherEdge && oldOutEdge.unsatisfiedEdge() == null) {
+                            outgoingMap[next] = new AlmostAcyclicityReason(oldOutEdge.satisfiedEdge(), new AlmostAcyclicityEdge(inEdge, true));
+                            workqueue.add(new AlmostAcyclicityNode(next, true));
                         }
                     }
                 }
@@ -535,10 +541,10 @@ public class AlmostAcyclicityPropagator extends AbstractUserPropagator {
             // Collect reason backwards
             int cur = graphEdge.getSource();
             AlmostAcyclicityReason reasonEdge;
-            AlmostAcyclicityEdge curEdge;
-            VarGraph.Edge curGraphEdge;
+            AlmostAcyclicityEdge curEdge = null;
+            VarGraph.Edge curGraphEdge = null;
             boolean otherEdgeSeen = !isOutgoingTransitive;
-            while ((reasonEdge = ingoingMap[cur]) != null) {
+            while ((reasonEdge = ingoingMap[cur]) != null && !(curEdge != null && curGraphEdge.getSource() == curGraphEdge.getTarget() && reasonEdge.unsatisfiedEdge() == null)) {
                 curEdge = otherEdgeSeen ? reasonEdge.unsatisfiedEdge() : reasonEdge.satisfiedEdge();
                 if (!curEdge.isTransitive()) {
                     otherEdgeSeen = true;
