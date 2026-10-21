@@ -13,6 +13,7 @@ import com.dat3m.dartagnan.utils.logic.DNF;
 import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
 import com.dat3m.dartagnan.wmm.definition.Composition;
+import com.dat3m.dartagnan.wmm.definition.TransitiveClosure;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
 
 import java.util.*;
@@ -29,7 +30,7 @@ public class EazyWMMSolver extends WMMSolver {
     private EazyWMMSolver(EncodingContext c, Collection<com.dat3m.dartagnan.wmm.Constraint> eazyConstraints,
                           TrivialImplications trivialImplications, boolean computeCoreReasons)
             throws InvalidConfigurationException {
-        super(c, new ExecutionGraph(c.getTask().getMemoryModel(), constraint -> c.isEncoded(constraint) && !isEazy(constraint, eazyConstraints),
+        super(c, new ExecutionGraph(c.getTask().getMemoryModel(), c.getAnalysisContext(), constraint -> c.isEncoded(constraint) && !isEazy(constraint, eazyConstraints),
                 eazyConstraints::contains));
         this.eazyConstraints = eazyConstraints;
         this.trivialImplications = trivialImplications;
@@ -41,9 +42,11 @@ public class EazyWMMSolver extends WMMSolver {
             return true;
         }
         for (final com.dat3m.dartagnan.wmm.Constraint eazyConstraint : eazyConstraints) {
-            if (constraint instanceof Composition comp && eazyConstraint instanceof final Irreflexivity irreflexivity
-                    && irreflexivity.collectCompositions().contains(comp)) {
-                return true;
+            if (eazyConstraint instanceof final Irreflexivity irreflexivity) {
+                if ((constraint instanceof Composition && irreflexivity.collectCompositions().contains(constraint))
+                        || (constraint instanceof TransitiveClosure && irreflexivity.getComponents().contains(constraint))) {
+                    return true;
+                }
             }
         }
         return false;

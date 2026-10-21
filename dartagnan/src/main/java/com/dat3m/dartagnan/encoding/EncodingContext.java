@@ -24,6 +24,7 @@ import com.dat3m.dartagnan.wmm.Wmm;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
 import com.dat3m.dartagnan.wmm.definition.DirectAddressDependency;
 import com.dat3m.dartagnan.wmm.definition.DirectDataDependency;
+import com.dat3m.dartagnan.wmm.definition.TransitiveClosure;
 import com.dat3m.dartagnan.wmm.utils.graph.EventGraph;
 import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
@@ -98,6 +99,11 @@ public final class EncodingContext {
             if (depGraph.contains(constraint)) {
                 final Constraint depGraphConstraint = depGraph.get(constraint).getContent();
                 if (depGraphConstraint instanceof final AxiomRefinementSolver.EazyIrreflexivity eazyIrreflexivity) {
+                    for (final Definition component : eazyIrreflexivity.getComponents()) {
+                        if (component instanceof TransitiveClosure) {
+                            constraintsToEncode.add(component);
+                        }
+                    }
                     constraintsToEncode.addAll(eazyIrreflexivity.collectCompositions());
                 }
                 constraintsToEncode.add(depGraph.get(constraint).getContent());

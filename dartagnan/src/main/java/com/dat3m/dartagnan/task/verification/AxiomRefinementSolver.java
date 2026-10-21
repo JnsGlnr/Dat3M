@@ -500,7 +500,15 @@ public class AxiomRefinementSolver extends RefinementSolver {
             return singleton((Definition) eazyConstraint);
         } else if (eazyConstraint instanceof final Axiom eazyAxiom) {
             if (eazyAxiom instanceof final EazyIrreflexivity irreflexivity) {
-                return irreflexivity.getComponents();
+                final List<Definition> eazyDefinitions = new ArrayList<>();
+                for (final Definition component : irreflexivity.getComponents()) {
+                    if (component instanceof final TransitiveClosure transitive) {
+                        eazyDefinitions.add(transitive.getOperand().getDefinition());
+                    } else {
+                        eazyDefinitions.add(component);
+                    }
+                }
+                return eazyDefinitions;
             } else {
                 return singleton(eazyAxiom.getRelation().getDefinition());
             }
