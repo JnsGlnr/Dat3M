@@ -174,7 +174,8 @@ public class AxiomRefinementSolver extends RefinementSolver {
         final Map<Constraint, Constraint> constraintsToEazyConstraints = getConstraintsToEazyConstraints(memoryModel.getAxioms(), wmmConstraintsToEncode);
         final Collection<Constraint> eazyConstraints = constraintsToEazyConstraints.values();
         wmmConstraintsToEncode.addAll(eazyConstraints);
-        wmmConstraintsToEncode.addAll(getNonStaticBaseConstraints(constraintsToEazyConstraints.keySet(), analysisContext));
+        final Collection<Constraint> nonStaticBaseConstraints = getNonStaticBaseConstraints(constraintsToEazyConstraints.keySet(), analysisContext);
+        wmmConstraintsToEncode.addAll(nonStaticBaseConstraints);
         if (baseMethod == Method.EAGER) {
             wmmConstraintsToEncode.addAll(memoryModel.getAxioms().stream()
                     .filter(not(eazyConstraints::contains))
@@ -195,7 +196,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
         final BooleanFormulaManager bmgr = ctx.getFormulaManager().getBooleanFormulaManager();
         final TrivialImplications trivialImplications = getTrivialImplications(eazyConstraints);
         final boolean computeCoreReasons = baseMethod == Method.LAZY;
-        final EazyWMMSolver solver = EazyWMMSolver.withContext(context, eazyConstraints, trivialImplications, computeCoreReasons);
+        final EazyWMMSolver solver = EazyWMMSolver.withContext(context, eazyConstraints, trivialImplications, computeCoreReasons, nonStaticBaseConstraints);
         final EazyRefiner refiner = EazyRefiner.newInstance();
         final Property.Type propertyType = Property.getCombinedType(task.getProperties(), task);
 

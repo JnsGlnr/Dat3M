@@ -10,6 +10,8 @@ import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.CoreLiteral;
 import com.dat3m.dartagnan.solver.caat4wmm.coreReasoning.TrivialImplications;
 import com.dat3m.dartagnan.utils.logic.Conjunction;
 import com.dat3m.dartagnan.utils.logic.DNF;
+import com.dat3m.dartagnan.wmm.Definition;
+import com.dat3m.dartagnan.wmm.Wmm;
 import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
 import com.dat3m.dartagnan.wmm.definition.Composition;
@@ -27,16 +29,19 @@ public class EazyWMMSolver extends WMMSolver {
     private final boolean computeCoreReasons;
 
     private EazyWMMSolver(EncodingContext c, Collection<com.dat3m.dartagnan.wmm.Constraint> eazyConstraints,
-                          TrivialImplications trivialImplications, boolean computeCoreReasons)
+                          TrivialImplications trivialImplications, boolean computeCoreReasons,
+                          final Collection<com.dat3m.dartagnan.wmm.Constraint> nonStaticBaseConstraints)
             throws InvalidConfigurationException {
-        super(c, new ExecutionGraph(c.getTask().getMemoryModel(), constraint -> c.isEncoded(constraint) && !isEazy(constraint, eazyConstraints),
+        super(c, new ExecutionGraph(c.getTask().getMemoryModel(),
+                constraint -> c.isEncoded(constraint) && !isEazy(constraint, eazyConstraints, nonStaticBaseConstraints),
                 eazyConstraints::contains));
         this.eazyConstraints = eazyConstraints;
         this.trivialImplications = trivialImplications;
         this.computeCoreReasons = computeCoreReasons;
     }
 
-    private static boolean isEazy(final com.dat3m.dartagnan.wmm.Constraint constraint, final Collection<com.dat3m.dartagnan.wmm.Constraint> eazyConstraints) {
+    private static boolean isEazy(final com.dat3m.dartagnan.wmm.Constraint constraint, final Collection<com.dat3m.dartagnan.wmm.Constraint> eazyConstraints,
+                                  final Collection<com.dat3m.dartagnan.wmm.Constraint> nonStaticBaseConstraints) {
         if (eazyConstraints.contains(constraint)) {
             return true;
         }
@@ -46,13 +51,18 @@ public class EazyWMMSolver extends WMMSolver {
                 return true;
             }
         }
+        if (constraint instanceof final Definition definition && Wmm.computeConstraintDependencies(constraint).isEmpty() && nonStaticBaseConstraints.contains(definition)
+                && !Wmm.ANARCHIC_CORE_RELATIONS.contains(definition.getDefinedRelation().getNameOrTerm())) {
+            return true;
+        }
         return false;
     }
 
     public static EazyWMMSolver withContext(EncodingContext context, Collection<com.dat3m.dartagnan.wmm.Constraint> eazyConstraints,
-                                            TrivialImplications trivialImplications, boolean computeCoreReasons)
+                                            TrivialImplications trivialImplications, boolean computeCoreReasons,
+                                            final Collection<com.dat3m.dartagnan.wmm.Constraint> nonStaticBaseConstraints)
             throws InvalidConfigurationException {
-        return new EazyWMMSolver(context, eazyConstraints, trivialImplications, computeCoreReasons);
+        return new EazyWMMSolver(context, eazyConstraints, trivialImplications, computeCoreReasons, nonStaticBaseConstraints);
     }
 
     public Result check(IREvaluator model) {
