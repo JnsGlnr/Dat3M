@@ -329,7 +329,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
                 }
             } else {
                 final VarGraph.Edge propEdge = graph.edgeMatrix[source][target];
-                if (propEdge != null && fromNode.check(source) && toNode.check(target)) {
+                if (propEdge != null && propEdge.isUnassigned() && fromNode.check(source) && toNode.check(target)) {
                     consequence.add(propEdge.getNegEdgeVar());
                     propagatedEdges.add(propEdge);
                 }
