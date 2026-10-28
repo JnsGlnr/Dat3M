@@ -45,9 +45,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.dat3m.dartagnan.configuration.OptionNames.BASE_METHOD;
+import static com.dat3m.dartagnan.configuration.OptionNames.TRIVIAL_IMPLICATIONS;
 import static com.dat3m.dartagnan.solver.caat.CAATSolver.Status.*;
 import static com.dat3m.dartagnan.task.verification.VerificationStatus.*;
 import static com.dat3m.dartagnan.utils.Utils.toTimeString;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.function.Predicate.not;
 
@@ -74,6 +76,12 @@ public class AxiomRefinementSolver extends RefinementSolver {
             secure=true,
             toUppercase=true)
     private Method baseMethod = Method.getDefault();
+
+    @Option(name=TRIVIAL_IMPLICATIONS,
+            description="Use trivial implications.",
+            secure=true,
+            toUppercase=true)
+    private boolean useTrivialImplications = true;
 
     // ================================================================================================================
     // Data classes
@@ -193,7 +201,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
         final SymmetryEncoder symmetryEncoder = SymmetryEncoder.withContext(context);
 
         final BooleanFormulaManager bmgr = ctx.getFormulaManager().getBooleanFormulaManager();
-        final TrivialImplications trivialImplications = getTrivialImplications(eazyConstraints);
+        final TrivialImplications trivialImplications = getTrivialImplications(eazyConstraints, useTrivialImplications);
         final boolean computeCoreReasons = baseMethod == Method.LAZY;
         final EazyWMMSolver solver = EazyWMMSolver.withContext(context, eazyConstraints, trivialImplications, computeCoreReasons);
         final EazyRefiner refiner = EazyRefiner.newInstance();
@@ -467,7 +475,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
         return nonStaticBaseConstraints;
     }
 
-    private TrivialImplications getTrivialImplications(Collection<? extends Constraint> eazyConstraints) {
+    private TrivialImplications getTrivialImplications(Collection<? extends Constraint> eazyConstraints, boolean enabled) {
         final ActiveSetAnalysis asa = context.getAnalysisContext().requires(ActiveSetAnalysis.class);
         final Map<Relation, Map<Relation, Map<RelLiteral, Set<TrivialImplications.Implied>>>> result = new LinkedHashMap<>();
         for (Constraint eazyConstraint : eazyConstraints) {
@@ -480,7 +488,7 @@ public class AxiomRefinementSolver extends RefinementSolver {
                     } else {
                         encodeSet = asa.getActiveSet(eazyDef);
                     }
-                    result.put(eazyRel, TrivialImplications.getTrivialImplications(context, eazyRel, encodeSet));
+                    result.put(eazyRel, enabled ? TrivialImplications.getTrivialImplications(context, eazyRel, encodeSet) : emptyMap());
                 }
             }
         }

@@ -18,6 +18,7 @@ import com.dat3m.dartagnan.task.verification.VerificationTaskSolver;
 import com.dat3m.dartagnan.task.enumeration.EnumerationSolver;
 import com.dat3m.dartagnan.task.SMTModelChecker;
 import com.dat3m.dartagnan.task.verification.RefinementSolver;
+import com.dat3m.dartagnan.task.verification.AxiomRefinementSolver;
 import com.dat3m.dartagnan.witness.graphviz.ExecutionGraphVisualizer;
 import com.dat3m.dartagnan.witness.svcomp.SvcompOutputGenerator;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
@@ -65,6 +66,7 @@ public final class OptionInfo implements Comparable<OptionInfo> {
                 ProgramPrinter.class,
                 SMTModelChecker.SMTConfig.class,
                 RefinementSolver.class,
+                AxiomRefinementSolver.class,
                 RelationAnalysis.Config.class,
                 WmmAnalysis.class,
                 ExecutionGraphVisualizer.class,

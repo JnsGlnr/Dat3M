@@ -71,6 +71,7 @@ public class OptionNames {
 
     // Axiom Refinement Options
     public static final String BASE_METHOD = "axiomRefinement.baseMethod";
+    public static final String TRIVIAL_IMPLICATIONS = "axiomRefinement.trivialImplications";
 
     // Refinement Options
     public static final String SYMMETRIC_LEARNING = "refinement.symmetricLearning";
