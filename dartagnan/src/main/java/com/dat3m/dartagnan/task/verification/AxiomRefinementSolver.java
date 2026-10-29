@@ -22,7 +22,6 @@ import com.dat3m.dartagnan.wmm.Definition;
 import com.dat3m.dartagnan.wmm.Relation;
 import com.dat3m.dartagnan.wmm.Wmm;
 import com.dat3m.dartagnan.wmm.analysis.RelationAnalysis;
-import com.dat3m.dartagnan.wmm.axiom.Acyclicity;
 import com.dat3m.dartagnan.wmm.axiom.Axiom;
 import com.dat3m.dartagnan.wmm.axiom.Irreflexivity;
 import com.dat3m.dartagnan.wmm.definition.*;
@@ -427,15 +426,6 @@ public class AxiomRefinementSolver extends RefinementSolver {
 
     private Map<Constraint, Constraint> getConstraintsToEazyConstraints(Collection<Axiom> axioms, Collection<Constraint> wmmConstraintsToEncode) {
         final Map<Constraint, Constraint> constraintsToEazyConstraints = new LinkedHashMap<>();
-        axioms.stream()
-                .filter(Acyclicity.class::isInstance)
-                .filter(not(wmmConstraintsToEncode::contains))
-                .forEach(a -> constraintsToEazyConstraints.put(a, new Acyclicity(a.getRelation(), a.isNegated(), a.isFlagged()) {
-                    @Override
-                    public List<? extends Relation> getConstrainedRelations() {
-                        return Collections.emptyList();
-                    }
-                }));
         axioms.stream()
                 .filter(Irreflexivity.class::isInstance)
                 .map(Irreflexivity.class::cast)
