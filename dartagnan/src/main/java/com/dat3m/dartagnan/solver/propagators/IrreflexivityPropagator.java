@@ -3,6 +3,7 @@ package com.dat3m.dartagnan.solver.propagators;
 import com.dat3m.dartagnan.encoding.EncodingContext;
 import com.dat3m.dartagnan.encoding.WmmEncoder;
 import com.dat3m.dartagnan.program.analysis.EventDomainRepository;
+import com.dat3m.dartagnan.program.analysis.ExecutionAnalysis;
 import com.dat3m.dartagnan.program.event.Event;
 import com.dat3m.dartagnan.utils.collections.IndexedDomain;
 import com.dat3m.dartagnan.utils.collections.IndexedSet;
@@ -43,6 +44,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
     private static final boolean allowDuplicatePropagation = false;
 
     private final RelationAnalysis relationAnalysis;
+    private final ExecutionAnalysis executionAnalysis;
     private final EncodingContext context;
     private final WmmEncoder wmmEncoder;
     private final List<Case> cases = new ArrayList<>();
@@ -50,6 +52,9 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
     private final Map<BooleanFormula, PatternGraph> lit2PatternEdges = new HashMap<>();
     private final IndexedDomain<Event> domain;
     private final BooleanFormulaManager bmgr;
+    private final ExecGraph exec;
+    private final Map<BooleanFormula, List<PartiallyResolvedMustEdge>> execToMustEdges;
+    private final Map<VarGraph.Edge, EdgeExecFormula> mustEdgeToExec;
 
     // -------- Dynamic search data --------
     private int curLevel = 0;
@@ -72,11 +77,15 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
     private IrreflexivityPropagator(WmmEncoder wmmEncoder, EncodingContext ctx) {
         this.context = ctx;
         this.relationAnalysis = ctx.getAnalysisContext().requires(RelationAnalysis.class);
+        this.executionAnalysis = ctx.getAnalysisContext().requires(ExecutionAnalysis.class);
         this.wmmEncoder = wmmEncoder;
 
         this.domain = ctx.getAnalysisContext().requires(EventDomainRepository.class)
                 .getDomain(EventDomainRepository.DomainBound.VISIBLE);
         this.bmgr = context.getBooleanFormulaManager();
+        this.exec = new ExecGraph(domain.size());
+        execToMustEdges = new HashMap<>(domain.size() * 4 / 3);
+        mustEdgeToExec = new HashMap<>();
     }
 
     public static IrreflexivityPropagator withContext(final EncodingContext context, final WmmEncoder wmmEncoder)
@@ -143,6 +152,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
         backend.notifyOnKnownValue();
 
         AtomicInteger numDynamicEdges = new AtomicInteger();
+        final Map<BooleanFormula, FormulaData> mustFormulas = new HashMap<>();
         final Map<Relation, PatternGraph> relToEdges = new HashMap<>();
         for (Case c : cases) {
             final Pattern pattern = c.pattern();
@@ -161,18 +171,36 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
                     EventGraph.union(activeSet, must).apply((x, y) -> {
                         final int idx = domain.indexOf(x);
                         final int idy = domain.indexOf(y);
+                        final BooleanFormula edgeLit = context.edgeVariable(rel.getNameOrTerm(), x, y);
                         if (must.contains(x, y)) {
-                            // TODO: This is unsound unless the must-edges satisfy
-                            //  (x,y) in must(r) /\ (y, z) in must(r) => (x, z) in must(r^+)
-                            //  which is the case for SC
-                            graph.addMustEdge(idx, idy);
+                            final EdgeExecFormula edgeExec;
+                            if (executionAnalysis.isImplied(x, y)) {
+                                edgeExec = registerSingleExecEdge(x, idx, edgeLit, backend);
+                            } else if (executionAnalysis.isImplied(y, x)) {
+                                edgeExec = registerSingleExecEdge(y, idy, edgeLit, backend);
+                            } else {
+                                final BooleanFormula execLitX = context.execution(x);
+                                final BooleanFormula execLitY = context.execution(y);
+                                final ExecGraph.ExecLiteral execX = exec.addVar(idx, execLitX);
+                                final ExecGraph.ExecLiteral execY = exec.addVar(idy, execLitY);
+                                final PartiallyResolvedMustEdge remainingX = new PartiallyResolvedMustEdge(edgeLit, execY);
+                                final PartiallyResolvedMustEdge remainingY = new PartiallyResolvedMustEdge(edgeLit, execX);
+                                execToMustEdges.computeIfAbsent(execLitX, k -> new ArrayList<>()).add(remainingX);
+                                execToMustEdges.computeIfAbsent(execLitY, k -> new ArrayList<>()).add(remainingY);
+                                backend.registerExpression(execLitX);
+                                backend.registerExpression(execLitY);
+                                edgeExec = new EdgeExecFormula(execLitX, execLitY);
+                            }
+                            final BooleanFormula exec = context.execution(x, y);
+                            VarGraph.Edge edge = graph.addMustEdge(idx, idy, exec);
+                            mustEdgeToExec.put(edge, edgeExec);
+                            mustFormulas.put(edgeLit, new FormulaData(newPatternGraph, edge));
                         } else {
-                            final BooleanFormula edgeLit = context.edge(rel, x, y);
                             lit2PatternEdges.put(edgeLit, newPatternGraph);
                             graph.addVarEdge(idx, idy, edgeLit);
                             backend.registerExpression(edgeLit);
-                            numDynamicEdges.getAndIncrement();
                         }
+                        numDynamicEdges.getAndIncrement();
                     });
                     relToEdges.put(rel, newPatternGraph);
                 } else {
@@ -202,7 +230,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
             }
         }
 
-        formulaLookup = new CachingFormulaMap<>(numDynamicEdges.get() * 2, key -> {
+        formulaLookup = new CachingFormulaMap<>(numDynamicEdges.get() * 2, mustFormulas, key -> {
             final PatternGraph patternGraph = lit2PatternEdges.get(key);
             final VarGraph.Edge edge = patternGraph.graph().getEdge(key);
             return new FormulaData(patternGraph, edge);
@@ -210,9 +238,19 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
         alreadyPropagatedEdges = Collections.newSetFromMap(new IdentityHashMap<>(numDynamicEdges.get()));
     }
 
+    private EdgeExecFormula registerSingleExecEdge(Event event, int id, BooleanFormula edgeLit, PropagatorBackend backend) {
+        final BooleanFormula execLit = context.execution(event);
+        exec.addVar(id, execLit);
+        final PartiallyResolvedMustEdge remaining = new PartiallyResolvedMustEdge(edgeLit, null);
+        execToMustEdges.computeIfAbsent(execLit, k -> new ArrayList<>()).add(remaining);
+        backend.registerExpression(execLit);
+        return new EdgeExecFormula(execLit, null);
+    }
+
     @Override
     public void onPush() {
         curLevel++;
+        exec.push();
         cases.forEach(c -> {
             c.pattern().push();
             c.subGraphs().keySet().forEach(rel -> relationGraphMap.get(rel).push());
@@ -224,6 +262,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
     public void onPop(int numPoppedLevels) {
         raisedConflict = false;
         curLevel -= numPoppedLevels;
+        exec.pop(numPoppedLevels);
         cases.forEach(c -> {
             c.pattern().pop(numPoppedLevels);
             c.subGraphs().keySet().forEach(rel -> relationGraphMap.get(rel).pop(numPoppedLevels));
@@ -241,33 +280,54 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
             return;
         }
 
+        final List<PartiallyResolvedMustEdge> mustEdges = execToMustEdges.get(expr);
+        if (mustEdges == null) {
+            onKnownEdgeValue(expr, value);
+        } else {
+            exec.assignLiteral(exec.getEdge(expr), value);
+            for (final PartiallyResolvedMustEdge mustData : mustEdges) {
+                final BooleanFormula mustExpr = mustData.mustEdge();
+                final ExecGraph.ExecLiteral otherExec = mustData.remainingExec();
+                if (otherExec == null) {
+                    onKnownEdgeValue(mustExpr, value);
+                } else if (!otherExec.isUnassigned()) {
+                    onKnownEdgeValue(mustExpr, value && otherExec.isTrue());
+                }
+            }
+        }
+    }
+
+    public void onKnownEdgeValue(BooleanFormula expr, boolean value) {
         final FormulaData data = formulaLookup.get(expr);
         final PatternGraph patternGraph = data.patternGraph();
         final VarGraph graph = patternGraph.graph();
         final VarGraph.Edge edge = data.edge();
-        graph.assignEdge(edge, value);
 
-        if (value) {
-            if (alreadyPropagatedEdges.contains(edge)) {
-                raisedConflict = true;
-                // System.out.println("Propagation conflict");
-                return;
-            }
-            for (final Map.Entry<Pattern, List<Pattern.Edge>> patternEdges : patternGraph.patternEdges().entrySet()) {
-                processEdgeAddition(patternEdges.getKey(), patternEdges.getValue(), edge);
-            }
+        if (edge.isUnassigned() || value != edge.isTrue()) {
+            graph.assignEdge(edge, value);
 
-            numChecks++;
-            if (numChecks % 1000000 == 0) {
-                System.out.println("numChecks: " + numChecks);
-                printStatistics();
-            }
-        } else if (usePartialPatternMatching) {
-            final int source = edge.getSource();
-            final int target = edge.getTarget();
-            for (final Map.Entry<Pattern, List<Pattern.Edge>> patternEdges : patternGraph.patternEdges().entrySet()) {
-                final Pattern pattern = patternEdges.getKey();
-                patternEdges.getValue().forEach(patternEdge -> pattern.removeEdge(patternEdge, source, target));
+            if (value) {
+                if (alreadyPropagatedEdges.contains(edge)) {
+                    raisedConflict = true;
+                    // System.out.println("Propagation conflict");
+                    return;
+                }
+                for (final Map.Entry<Pattern, List<Pattern.Edge>> patternEdges : patternGraph.patternEdges().entrySet()) {
+                    processEdgeAddition(patternEdges.getKey(), patternEdges.getValue(), edge);
+                }
+
+                numChecks++;
+                if (numChecks % 1000000 == 0) {
+                    System.out.println("numChecks: " + numChecks);
+                    printStatistics();
+                }
+            } else if (usePartialPatternMatching) {
+                final int source = edge.getSource();
+                final int target = edge.getTarget();
+                for (final Map.Entry<Pattern, List<Pattern.Edge>> patternEdges : patternGraph.patternEdges().entrySet()) {
+                    final Pattern pattern = patternEdges.getKey();
+                    patternEdges.getValue().forEach(patternEdge -> pattern.removeEdge(patternEdge, source, target));
+                }
             }
         }
     }
@@ -305,9 +365,7 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
             final int source = match[patternEdge.from().id()];
             final int target = match[patternEdge.to().id()];
             final VarGraph.Edge edge = graph.getEdge(source, target);
-            if (!edge.isMust()) {
-                conflictVars.add(edge.getEdgeVar());
-            }
+            addToReason(conflictVars, edge);
         }
         return conflictVars;
     }
@@ -324,13 +382,11 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
             final int target = match[toNode.id()];
             final VarGraph.Edge edge = graph.containsWithEdge(source, target);
             if (edge != null) {
-                if (!edge.isMust()) {
-                    reason.add(edge.getEdgeVar());
-                }
+                addToReason(reason, edge);
             } else {
                 final VarGraph.Edge propEdge = graph.edgeMatrix[source][target];
                 if (propEdge != null && propEdge.isUnassigned() && fromNode.check(source) && toNode.check(target)) {
-                    consequence.add(propEdge.getNegEdgeVar());
+                    consequence.add(propEdge.getNegEdgeFormula());
                     propagatedEdges.add(propEdge);
                 }
             }
@@ -347,6 +403,19 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
             }
         }
         return new PropagationResult(reason, consequence);
+    }
+
+    private void addToReason(List<BooleanFormula> reason, VarGraph.Edge edge) {
+        if (edge.isMust()) {
+            final EdgeExecFormula edgeExec = mustEdgeToExec.get(edge);
+            reason.add(edgeExec.exec1());
+            final BooleanFormula exec2 = edgeExec.exec2();
+            if (exec2 != null) {
+                reason.add(exec2);
+            }
+        } else {
+            reason.add(edge.getEdgeVar());
+        }
     }
 
     // ---------------------------------------- Statistics ----------------------------------------
@@ -375,6 +444,10 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
 
     private record PropagationResult(List<BooleanFormula> reason, List<BooleanFormula> consequence) { }
 
+    private record PartiallyResolvedMustEdge(BooleanFormula mustEdge, ExecGraph.ExecLiteral remainingExec) { }
+
+    private record EdgeExecFormula(BooleanFormula exec1, BooleanFormula exec2) { }
+
 
     // TODO: Test code to minimize hashtable lookup times with BooleanFormula
     //  The IdentityHashMap is used to avoid expensive .equals calls on BooleanFormula
@@ -384,8 +457,10 @@ public class IrreflexivityPropagator extends AbstractUserPropagator {
         private final IdentityHashMap<BooleanFormula, TData> formulaLookup;
         private final Function<BooleanFormula, TData> dataConstructor;
 
-        public CachingFormulaMap(int expectedMaxSize, Function<BooleanFormula, TData> dataConstructor) {
+        public CachingFormulaMap(int expectedMaxSize, Map<BooleanFormula, TData> initialData,
+                                 Function<BooleanFormula, TData> dataConstructor) {
             this.formulaLookup = new IdentityHashMap<>(expectedMaxSize);
+            this.formulaLookup.putAll(initialData);
             this.dataConstructor = dataConstructor;
         }
 
