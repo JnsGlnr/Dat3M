@@ -436,12 +436,6 @@ public class AxiomRefinementSolver extends RefinementSolver {
                         return Collections.emptyList();
                     }
                 }));
-        axioms.stream()
-                .filter(Irreflexivity.class::isInstance)
-                .map(Irreflexivity.class::cast)
-                .filter(not(wmmConstraintsToEncode::contains))
-                .filter(a -> a.getComponents().size() > 1)
-                .forEach(a -> constraintsToEazyConstraints.put(a, new EazyIrreflexivity(a)));
         return constraintsToEazyConstraints;
     }
 
